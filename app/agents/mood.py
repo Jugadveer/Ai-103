@@ -1,24 +1,43 @@
 """
-Mood agent - daily wellbeing score on a 1-10 scale.
+Mood agent - daily wellbeing, self-reported.
 
-Mood correlates strongly with sleep, so this agent is a frequent peer in
+Mood cannot be measured by a phone. No sensor reads it, and anything
+claiming to infer it from typing speed or tone is guessing. So this agent
+asks, on a plain one-to-ten scale with worded anchors so the number means
+roughly the same thing from one day to the next. That is how mood is
+captured clinically too: the person reports it.
+
+Mood tracks strongly with sleep, which makes this a frequent peer in
 cross-agent reasoning. Anything suggesting self-harm is caught by the
-safety layer before it ever reaches here.
+safety layer before it ever reaches this agent.
 """
 from app.agents.base import BaseAgent, AgentReply
 from app.store import db
 
 
+# Anchors, so a 4 means something comparable from one week to the next.
+SCALE = {
+    1: "At my worst", 2: "Very low", 3: "Low", 4: "Below par",
+    5: "Neutral", 6: "Reasonable", 7: "Good", 8: "Really good",
+    9: "Excellent", 10: "At my best",
+}
+
+
 class MoodAgent(BaseAgent):
     name = "mood"
-    description = "Tracks daily mood scores and wellbeing trends."
+    description = (
+        "Tracks self-reported daily mood on a 1-10 scale with worded "
+        "anchors. Measures nothing: mood cannot be sensed, only reported."
+    )
 
     def handle(self, query: str) -> AgentReply:
         f = self.report()
         if f["days_logged"] == 0:
             return AgentReply(
                 agent=self.name,
-                text="No mood logged yet. Tell me how you're feeling out of 10.",
+                text="No mood logged yet. I cannot sense how you feel, so "
+                     "you have to tell me: where are you on a 1 to 10, "
+                     "where 5 is neutral and 8 is really good?",
                 data=f,
             )
         text = (f"Your mood has averaged {f['avg_score']} out of 10 across "
@@ -48,8 +67,12 @@ class MoodAgent(BaseAgent):
             elif recent > older + 1:
                 trend = "rising"
 
+        today_score = scores[0] if n else None
         return {
             "has_data": n > 0,
+            "self_reported": True,     # mood cannot be measured, only asked
+            "scale": SCALE,
+            "today_label": SCALE.get(int(today_score)) if today_score else None,
             "days_logged": n,
             "avg_score": avg,
             "today_score": scores[0] if n else None,

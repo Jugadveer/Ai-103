@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app import config
 from app.agents.activity import ActivityAgent
+from app.agents.assessment import AssessmentAgent
 from app.agents.bus import AgentBus
 from app.agents.coach import CoachAgent
 from app.agents.hydration import HydrationAgent
@@ -28,6 +29,7 @@ from app.agents.symptom import SymptomAgent
 from app.agents.vitals import VitalsAgent
 from app.core import logging as log
 from app.core.errors import ValidationError
+from app.core.validation import check_number
 from app.services import llm as speech_llm
 from app.services import speech
 from app.store import db
@@ -57,6 +59,7 @@ AGENT_CLASSES = (
     MedicationAgent,
     SymptomAgent,
     ProgressAgent,     # ---- meta-agents, hold no data ----
+    AssessmentAgent,
     InsightsAgent,
     ReportAgent,
 )
@@ -171,6 +174,49 @@ def history(days: int = 14):
     """Per-day series for every tracked metric, gaps preserved as null."""
     days = max(3, min(90, days))
     return db.all_series(days)
+
+
+class ProfileEntry(BaseModel):
+    age: int | None = None
+    sex: str | None = None
+    activity_level: str | None = None
+
+
+@app.get("/api/profile")
+def read_profile():
+    from app.core.energy import ACTIVITY_LEVELS
+    return {
+        "profile": db.get_profile(),
+        "activity_levels": {k: v[1] for k, v in ACTIVITY_LEVELS.items()},
+    }
+
+
+@app.post("/api/profile")
+def save_profile(req: ProfileEntry):
+    """Age, sex and activity level. Used only to estimate energy needs."""
+    from app.core.energy import ACTIVITY_LEVELS
+    errors = []
+    if req.age is not None:
+        try:
+            db.set_profile("age", int(check_number("age", req.age)))
+        except ValidationError as exc:
+            errors.append(exc.user_message)
+    if req.sex:
+        db.set_profile("sex", req.sex.lower()[:12])
+    if req.activity_level:
+        if req.activity_level in ACTIVITY_LEVELS:
+            db.set_profile("activity_level", req.activity_level)
+        else:
+            errors.append("That is not one of the activity levels.")
+    return {"ok": not errors, "errors": errors, "profile": db.get_profile()}
+
+
+@app.get("/api/assessment")
+def assessment():
+    """The whole-picture review, including the energy calculation."""
+    bus.reset_trace()
+    reply = bus.get("assessment").safe_handle("review")
+    return {"text": reply.text, "data": reply.data, "trace": bus.trace}
 
 
 @app.get("/api/progress")

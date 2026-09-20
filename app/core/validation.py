@@ -20,6 +20,7 @@ RANGES = {
     "diastolic":      (30, 160, "mmHg", "outside measurable blood pressure range"),
     "mood_score":     (1, 10, "out of 10", "mood is recorded on a 1-10 scale"),
     "height_cm":      (100, 250, "cm", "outside plausible adult height"),
+    "age":            (13, 120, "years", "outside the range this app is built for"),
 }
 
 

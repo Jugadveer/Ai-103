@@ -76,6 +76,12 @@ CREATE TABLE IF NOT EXISTS med_log (
     logged_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS profile (
+    key       TEXT PRIMARY KEY,
+    value     TEXT NOT NULL,
+    set_at    TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_meals_day    ON meals(day);
 CREATE INDEX IF NOT EXISTS idx_water_day    ON water(day);
 CREATE INDEX IF NOT EXISTS idx_sleep_day    ON sleep(day);
@@ -199,10 +205,27 @@ def log_medication_taken(med_id: int, day: str | None = None) -> None:
     )
 
 
+# --- profile -------------------------------------------------------------
+# Age, sex and usual activity level. Needed to estimate energy needs, and
+# nothing else. Sex is asked for because the standard equation uses it.
+
+def set_profile(key: str, value) -> None:
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO profile (key, value, set_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+            "set_at = excluded.set_at",
+            (key, str(value), _now()))
+
+
+def get_profile() -> dict:
+    return {r["key"]: r["value"] for r in query("SELECT key, value FROM profile")}
+
+
 def clear_all() -> None:
     """Wipe every table. Used by tests and the demo seeder."""
     tables = ("meals", "water", "sleep", "symptoms", "activity",
-              "vitals", "mood", "medications", "med_log")
+              "vitals", "mood", "medications", "med_log", "profile")
     with connect() as conn:
         for t in tables:
             conn.execute(f"DELETE FROM {t}")

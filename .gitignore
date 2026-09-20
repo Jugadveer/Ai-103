@@ -27,5 +27,5 @@ data/audio/
 .DS_Store
 Thumbs.db
 
-# Local Claude tooling - not part of the submission
+# Local editor and agent tooling - not part of the submission
 .claude/

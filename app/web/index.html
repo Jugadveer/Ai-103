@@ -38,12 +38,13 @@
     <a href="#coach"    data-route="coach"><span class="glyph">02</span>Coach</a>
     <a href="#voice"    data-route="voice"><span class="glyph">03</span>Voice</a>
     <a href="#trends"   data-route="trends"><span class="glyph">04</span>Trends</a>
-    <a href="#body"     data-route="body"><span class="glyph">05</span>Body</a>
-    <a href="#progress" data-route="progress"><span class="glyph">06</span>Progress</a>
-    <a href="#report"   data-route="report"><span class="glyph">07</span>Report</a>
+    <a href="#review"   data-route="review"><span class="glyph">05</span>Review</a>
+    <a href="#body"     data-route="body"><span class="glyph">06</span>Body</a>
+    <a href="#progress" data-route="progress"><span class="glyph">07</span>Progress</a>
+    <a href="#report"   data-route="report"><span class="glyph">08</span>Report</a>
     <div class="divider"></div>
     <div class="section-label">Under the hood</div>
-    <a href="#agents"   data-route="agents"><span class="glyph">08</span>Agents</a>
+    <a href="#agents"   data-route="agents"><span class="glyph">09</span>Agents</a>
   </div>
 
   <div class="nav-foot">
@@ -74,8 +75,11 @@
       <button data-action="steps"  data-value="1000">Steps <span class="plus">+1000</span></button>
       <button data-action="active" data-value="15">Movement <span class="plus">+15 min</span></button>
       <button data-action="sleep"  data-value="7">Sleep <span class="plus">7 hours</span></button>
-      <button data-action="mood"   data-value="7">Mood <span class="plus">7 / 10</span></button>
     </div>
+
+    <div class="section-title">How are you feeling
+      <span class="tally">self-reported, nothing here senses it</span></div>
+    <div class="mood-scale" id="mood-scale"></div>
 
     <div class="section-title">Where you stand</div>
     <div class="readouts" id="readouts"></div>
@@ -148,6 +152,21 @@ I am a wellness coach, not a doctor. I share general information and never diagn
     <div class="charts" id="charts"></div>
   </section>
 
+  <!-- ============ REVIEW ============ -->
+  <section class="page" id="page-review">
+    <div class="page-head">
+      <h2>Review</h2>
+      <p>The whole picture in one pass. Every other agent is consulted, your
+         daily energy needs are estimated from what you have told us, and
+         what you logged is checked against them. Observations only: it does
+         not diagnose, and it does not advise on medication.</p>
+    </div>
+
+    <button class="btn primary" id="run-review" type="button">Run the review</button>
+    <div id="energy-summary"></div>
+    <div id="review-out" style="margin-top:18px"></div>
+  </section>
+
   <!-- ============ BODY ============ -->
   <section class="page" id="page-body">
     <div class="page-head">
@@ -172,6 +191,33 @@ I am a wellness coach, not a doctor. I share general information and never diagn
       <button class="btn primary" type="submit">Calculate and save</button>
     </form>
     <div id="bmi-out" class="result"></div>
+
+    <div class="section-title">About you</div>
+    <p class="placeholder" style="margin:-4px 0 12px">
+      Used for one thing only: estimating how many calories you need in a
+      day. The standard equation takes age and sex as inputs.
+    </p>
+    <form class="entry-form" id="profile-form">
+      <label>Age
+        <span class="unit">years</span>
+        <input type="number" id="in-age" min="13" max="120" placeholder="21"
+               inputmode="numeric">
+      </label>
+      <label>Sex
+        <span class="unit">for the equation</span>
+        <select id="in-sex">
+          <option value="">Prefer not to say</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </label>
+      <label>Usual activity
+        <span class="unit">per week</span>
+        <select id="in-activity"></select>
+      </label>
+      <button class="btn primary" type="submit">Save</button>
+    </form>
+    <div id="profile-out" class="result"></div>
 
     <div class="section-title">Readings from a monitor or clinic</div>
     <p class="placeholder" style="margin:-4px 0 12px">

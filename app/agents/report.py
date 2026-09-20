@@ -13,7 +13,7 @@ from app.agents.base import BaseAgent, AgentReply
 from app.store import db
 
 # Agents that hold no data of their own.
-NON_DATA_AGENTS = ("coach", "insights", "report")
+NON_DATA_AGENTS = ("coach", "insights", "report", "progress", "assessment")
 
 
 class ReportAgent(BaseAgent):
@@ -77,6 +77,24 @@ class ReportAgent(BaseAgent):
         if readings:
             lines.append("VITALS   " + ", ".join(readings))
 
+        # Energy requirement, when we hold enough to compute one. A
+        # clinician reading this wants intake against requirement, not
+        # intake alone.
+        profile = db.get_profile()
+        if vit.get("weight_kg") and vit.get("height_cm") and profile.get("age"):
+            try:
+                from app.core import energy
+                needs = energy.maintenance(
+                    vit["weight_kg"], vit["height_cm"], int(profile["age"]),
+                    profile.get("sex", ""),
+                    profile.get("activity_level", energy.DEFAULT_LEVEL))
+                lines.append(
+                    f"ENERGY   est. maintenance {needs['maintenance']} kcal/day "
+                    f"({needs['range_low']}-{needs['range_high']}), "
+                    f"Mifflin-St Jeor")
+            except (ValueError, TypeError):
+                pass
+
         md = peers.get("mood", {})
         if md.get("days_logged"):
             lines.append(
@@ -102,6 +120,8 @@ class ReportAgent(BaseAgent):
 
         lines += [
             "",
+            "All figures are self-reported by the patient. Nothing here was "
+            "measured by a device. Calorie and energy figures are estimates.",
             "Prepared by a student wellness app. No diagnosis is implied and "
             "no clinician has reviewed this.",
         ]

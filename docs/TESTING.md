@@ -4,7 +4,7 @@
 python -m pytest tests/ -q
 ```
 
-**218 tests, all passing, in about 5 seconds.** No Azure credentials needed —
+**253 tests, all passing, in about 5 seconds.** No Azure credentials needed —
 the suite runs entirely in `MOCK_MODE` against a throwaway SQLite file.
 
 Testing, reliability and responsible AI carry 15% of the project grade, and
@@ -18,7 +18,7 @@ the safety tests below are the ones to demonstrate if asked.
 | `test_nutrition.py` | 41 | Food recognition, clarification, self-reported vitals |
 | `test_progress.py` | 22 | Streaks, achievements, history gaps, installable routes |
 | `test_nlu.py` | 41 | Intent classification and entity extraction |
-| `test_safety.py` | 29 | Emergency escalation and scope refusal |
+| `test_safety.py` | 32 | Emergency escalation and scope refusal |
 | `test_agents.py` | 30 | Each agent's calculations in isolation |
 | `test_crossagent.py` | 15 | Agent-to-agent communication |
 | `test_api.py` | 11 | HTTP endpoints and boundary validation |

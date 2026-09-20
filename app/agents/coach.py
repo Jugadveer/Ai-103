@@ -36,6 +36,8 @@ ROUTES = {
                    "prescription", "adherence"],
     "progress": ["streak", "progress", "achievement", "badge", "ring",
                  "level", "points", "goal"],
+    "assessment": ["maintenance", "tdee", "overeating", "undereating",
+                   "deficit", "surplus", "energy needs", "assessment"],
     "symptom": ["headache", "pain", "ache", "dizzy", "nausea", "fever", "sick",
                 "symptom", "unwell", "hurts", "cramp", "sore", "cough"],
 }
@@ -135,7 +137,7 @@ class CoachAgent(BaseAgent):
         if intent == "checkin":
             return self._checkin()
 
-        if intent in ("insights", "report", "progress"):
+        if intent in ("insights", "report", "progress", "assessment"):
             return self._delegate(intent, query)
 
         # 5. Free text we could not classify - this is the only path where

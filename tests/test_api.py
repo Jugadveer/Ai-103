@@ -5,14 +5,14 @@ def test_health_lists_agents_and_azure_status(client):
     d = client.get("/api/health").json()
     assert d["status"] == "ok"
     assert d["mock_mode"] is True
-    assert len(d["agents"]) == 12
+    assert len(d["agents"]) == 13
     # Azure flags are all False until real keys are added to .env
     assert set(d["azure"]) == {"openai", "search", "speech", "content_safety"}
 
 
 def test_agents_endpoint_describes_each_agent(client):
     rows = client.get("/api/agents").json()
-    assert len(rows) == 12
+    assert len(rows) == 13
     for row in rows:
         assert row["name"] and row["description"]
 
@@ -54,7 +54,7 @@ def test_chat_rejects_malformed_body(client):
 
 def test_dashboard_returns_every_agent_report(client):
     d = client.get("/api/dashboard").json()
-    assert len(d) == 12
+    assert len(d) == 13
     assert "glasses_today" in d["hydration"]
     assert "avg_hours" in d["sleep"]
 

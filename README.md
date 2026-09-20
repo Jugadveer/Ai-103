@@ -25,8 +25,8 @@ A team of specialist AI agents that **communicate with each other** to explain
 how a person feels, using their own logged data.
 
 The user talks (by voice or text) to a single **Coach** agent. Behind it sit
-ten more: seven specialists that each own one domain, a Symptom agent, and
-two meta-agents that hold no data of their own.
+twelve more: eight specialists that each own one domain, and four meta-agents
+that hold no data at all and work entirely by asking the others.
 
 | Agent | Owns | Kind |
 |---|---|---|
@@ -40,6 +40,8 @@ two meta-agents that hold no data of their own.
 | `medication` | Adherence tracking (never dosing) | specialist |
 | `symptom` | Symptom correlation + RAG | specialist |
 | `insights` | Cross-domain pattern detection | meta |
+| `progress` | Streaks, daily goals, achievements | meta |
+| `assessment` | Energy needs, intake cross-checks, whole-picture review | meta |
 | `report` | Doctor-ready health summary | meta |
 
 When the user reports a symptom, the Symptom agent doesn't answer alone: it
@@ -71,9 +73,12 @@ Coach: "Looking at what you've logged, I can see a sleep debt of about
 One question, eight agents, one joined-up answer. **That collaboration is the
 project** — not the tracking.
 
-Two further agents build on the same mechanism: `insights` scans every domain
-for cross-domain patterns, and `report` compiles a summary the user can hand
-to a real clinician.
+Three further agents build on the same mechanism. `insights` scans every
+domain for cross-domain patterns. `progress` derives streaks and achievements
+from real logged data. `assessment` estimates daily energy needs from height,
+weight, age and activity, then checks logged intake against them: an intake
+far below requirement is read as incomplete logging rather than starvation,
+which is the kind of judgement a single-domain tracker cannot make.
 
 ### What it deliberately does not do
 
@@ -140,13 +145,15 @@ agent through the bus, and the bus records the exchange. Full detail in
 
 ### AI-103 concepts applied
 
-- **Multi-agent systems** — twelve agents with distinct responsibilities
+- **Multi-agent systems** — thirteen agents with distinct responsibilities
 - **Cross-agent communication** — a message bus with a full, inspectable trace
 - **Agent orchestration** — the Coach routes, delegates and synthesises
 - **RAG** — grounded answers from a curated knowledge base
 - **Tools** — agents expose `report()` as a callable capability to peers
 - **Intent recognition** — deterministic entity extraction before any model call
-- **Speech / multimodal** — voice in, voice out
+- **Speech / multimodal** — voice in, voice out, and meals read from a photo
+- **Multi-turn dialogue** — the model decides when a meal is too vague to log
+  honestly and asks, rather than guessing
 - **Responsible AI** — safety gate, scope limits, escalation, disclaimers
 
 ## Setup instructions
@@ -183,16 +190,19 @@ python -m scripts.seed
 python -m pytest tests/ -q
 ```
 
-**218 tests, all passing.** Full breakdown in [docs/TESTING.md](docs/TESTING.md).
+**253 tests, all passing.** Full breakdown in [docs/TESTING.md](docs/TESTING.md).
 
 | Suite | Tests | Covers |
 |---|---|---|
 | `test_validation.py` | 24 | Plausible-range bounds on every health value |
 | `test_nlu.py` | 41 | Intent classification and entity extraction |
-| `test_safety.py` | 29 | Emergency escalation, scope refusal, false positives |
+| `test_safety.py` | 32 | Emergency escalation, scope refusal, false positives |
 | `test_agents.py` | 30 | Each agent's calculations in isolation |
 | `test_crossagent.py` | 15 | Agent-to-agent communication and the trace |
-| `test_api.py` | 11 | Every HTTP endpoint and input validation |
+| `test_nutrition.py` | 41 | Food recognition, clarification, self-reported vitals |
+| `test_assessment.py` | 35 | Energy estimates, and the limits the review keeps to |
+| `test_progress.py` | 22 | Streaks, achievements, history gaps, install routes |
+| `test_api.py` | 13 | Every HTTP endpoint and input validation |
 
 The safety tests are the most important ones in the project: they assert that
 emergencies escalate, that diagnosis is refused, that ordinary messages are
@@ -200,6 +210,18 @@ emergencies escalate, that diagnosis is refused, that ordinary messages are
 
 ## Known limitations
 
+Stated plainly, because several of them are the reason features are shaped
+the way they are.
+
+- **The app measures nothing.** There is no wearable and no sensor. Heart
+  rate, blood pressure, steps, weight and mood are all typed in by the user.
+  BMI and energy needs are computed, but only from numbers the user supplied
+- **Mood cannot be sensed**, so it is asked for on a 1-10 scale with worded
+  anchors rather than inferred
+- **Calorie figures are estimates** from typical serving sizes, not weighed
+  measurements, and the interface says so wherever one is shown
+- **Energy needs use Mifflin-St Jeor**, which is routinely out by ten percent
+  and worse at the extremes of body composition
 - Single-user; no authentication or multi-user accounts
 - Knowledge base is small and must be replaced with properly cited sources
 - Keyword-first intent routing, with the model only as fallback
@@ -216,12 +238,17 @@ emergencies escalate, that diagnosis is refused, that ordinary messages are
 
 ## Acknowledgements
 
-<!-- TODO: list every third-party resource before submission — this is a
-     graded requirement -->
 
 - Azure AI services documentation — Microsoft
 - FastAPI, Uvicorn, Pydantic, pytest — open-source libraries
 - Health knowledge base content — _replace placeholders with cited sources_
+- Calorie reference figures — public nutrition labels and standard portion
+  tables. Approximate typical servings, labelled as estimates throughout
+- Resting metabolic rate — the Mifflin-St Jeor equation, a published
+  standard. Used as an estimate with a stated margin, never as a measurement
+- **AI-assisted development tools** were used during implementation, to help
+  work through code and debugging. All code in this repository is understood
+  by the team, and every part of it can be explained on request.
 
 ---
 

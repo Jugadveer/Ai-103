@@ -568,3 +568,69 @@ button:disabled { opacity: .45; cursor: default; }
   margin-top: 8px; max-width: 220px; border: 1px solid var(--rule);
   display: block;
 }
+
+
+/* ---------- mood scale ---------- */
+
+.mood-scale { display: flex; flex-wrap: wrap; gap: 1px;
+              background: var(--rule); border: 1px solid var(--rule); }
+.mood-scale button {
+  flex: 1 1 62px; background: var(--paper); border: 0; color: var(--ink);
+  padding: 10px 4px 9px; display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
+}
+.mood-scale button .n {
+  font-family: var(--mono); font-size: 17px; font-weight: 600;
+}
+.mood-scale button .word {
+  font-size: 9.5px; color: var(--ink-faint); text-align: center;
+  line-height: 1.25;
+}
+.mood-scale button:hover:not(:disabled) { background: var(--accent-wash); }
+.mood-scale button:hover .n { color: var(--accent); }
+.mood-scale button.is-picked { background: var(--accent); }
+.mood-scale button.is-picked .n,
+.mood-scale button.is-picked .word { color: #fff; }
+
+/* ---------- select, matching the number inputs ---------- */
+
+.entry-form select {
+  border: 1px solid var(--rule); background: var(--paper-raise);
+  color: var(--ink); font: inherit; padding: 8px 10px; min-width: 150px;
+}
+.entry-form select:focus {
+  outline: 2px solid var(--accent); outline-offset: -2px;
+  border-color: var(--accent);
+}
+
+/* ---------- review findings ---------- */
+
+.energy-band {
+  display: flex; flex-wrap: wrap; gap: 1px; margin-top: 18px;
+  background: var(--rule); border: 1px solid var(--rule);
+}
+.energy-band .cell { flex: 1 1 150px; background: var(--paper); padding: 14px 16px; }
+.energy-band .k {
+  font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 600;
+}
+.energy-band .v {
+  font-family: var(--mono); font-size: 24px; font-weight: 600; margin-top: 3px;
+  letter-spacing: -0.03em;
+}
+.energy-band .v.is-over { color: var(--warn); }
+.energy-band .v.is-under { color: var(--warn); }
+.energy-band .v.is-ok { color: var(--accent); }
+.energy-band .sub { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+
+.finding {
+  border-left: 2px solid var(--rule); padding: 0 0 0 14px; margin-bottom: 16px;
+}
+.finding.is-flag { border-left-color: var(--warn); }
+.finding h4 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+.finding p { margin: 0; font-size: 13.5px; color: var(--ink-soft);
+             max-width: 68ch; line-height: 1.55; }
+.finding .evidence {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint);
+  margin-top: 4px;
+}

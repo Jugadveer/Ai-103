@@ -39,6 +39,7 @@ const ROUTES = {
   voice:    () => {},
   trends:   refreshTrends,
   body:     refreshBody,
+  review:   refreshReviewPage,
   progress: refreshProgress,
   report:   () => {},
   agents:   refreshAgents,
@@ -349,6 +350,133 @@ async function refreshBody() {
     + (row[1] ? escapeHtml(row[1]) : 'not entered') + '</div></div>'
   ).join('');
 }
+
+/* ---------------- Review ----------------
+   The whole-picture pass. Energy needs are arithmetic on numbers the user
+   supplied, so the working is shown rather than asserted. */
+
+let reviewLoaded = false;
+
+function refreshReviewPage() {
+  if (!reviewLoaded) {
+    $('review-out').innerHTML = '<p class="placeholder">Run the review and '
+      + 'every agent will be consulted.</p>';
+  }
+}
+
+function energyBand(e, findings) {
+  if (!e) return '';
+  const balance = findings.find(f => f.topic === 'Energy balance'
+                                  || f.topic === 'Intake looks incomplete');
+  let tone = 'is-ok', note = 'close to maintenance';
+  if (balance && balance.topic === 'Intake looks incomplete') {
+    tone = 'is-under'; note = 'looks part-logged';
+  } else if (balance && /below/.test(balance.evidence)) {
+    tone = 'is-under'; note = 'below maintenance';
+  } else if (balance && /above/.test(balance.evidence)) {
+    tone = 'is-over'; note = 'above maintenance';
+  }
+  return '<div class="energy-band">'
+    + '<div class="cell"><div class="k">Resting rate</div>'
+    + '<div class="v">' + e.resting + '</div>'
+    + '<div class="sub">kcal per day at rest</div></div>'
+    + '<div class="cell"><div class="k">Maintenance</div>'
+    + '<div class="v ' + tone + '">' + e.maintenance + '</div>'
+    + '<div class="sub">' + e.range_low + ' to ' + e.range_high
+    + ' kcal, ' + note + '</div></div>'
+    + '<div class="cell"><div class="k">Activity factor</div>'
+    + '<div class="v">x' + e.activity_factor + '</div>'
+    + '<div class="sub">' + escapeHtml(e.activity_label) + '</div></div>'
+    + '</div>';
+}
+
+$('run-review').addEventListener('click', async e => {
+  e.target.disabled = true;
+  e.target.textContent = 'Consulting every agent';
+  try {
+    const d = await api.get('/api/assessment');
+    state.trace = d.trace || [];
+    reviewLoaded = true;
+    const findings = (d.data && d.data.findings) || [];
+    const energy = d.data && d.data.energy;
+
+    $('energy-summary').innerHTML = energyBand(energy, findings);
+
+    const flagWords = /incomplete|doctor|clinician|low|debt|below|missing/i;
+    $('review-out').innerHTML = findings.map(f =>
+      '<div class="finding' + (flagWords.test(f.topic) ? ' is-flag' : '') + '">'
+      + '<h4>' + escapeHtml(f.topic) + '</h4>'
+      + '<p>' + escapeHtml(f.text) + '</p>'
+      + '<div class="evidence">' + escapeHtml(f.evidence) + '</div>'
+      + '</div>').join('')
+      + '<p class="disclaimer">Observations about what you logged, not a '
+      + 'diagnosis. Energy figures come from a standard equation and are '
+      + 'routinely out by ten percent. Anything medical belongs with a '
+      + 'doctor.</p>';
+  } catch (err) {
+    $('review-out').innerHTML = '<p class="placeholder">Could not run the '
+      + 'review. Is the server running?</p>';
+  }
+  e.target.disabled = false;
+  e.target.textContent = 'Run it again';
+});
+
+/* ---------------- mood scale ----------------
+   Mood cannot be sensed, so it is asked for, with worded anchors so a 4
+   means roughly the same thing from one week to the next. */
+
+const MOOD_WORDS = {
+  1: 'At my worst', 2: 'Very low', 3: 'Low', 4: 'Below par', 5: 'Neutral',
+  6: 'Reasonable', 7: 'Good', 8: 'Really good', 9: 'Excellent',
+  10: 'At my best',
+};
+
+function renderMoodScale(picked) {
+  $('mood-scale').innerHTML = Object.keys(MOOD_WORDS).map(n =>
+    '<button type="button" data-score="' + n + '"'
+    + (String(picked) === n ? ' class="is-picked"' : '') + '>'
+    + '<span class="n">' + n + '</span>'
+    + '<span class="word">' + MOOD_WORDS[n] + '</span></button>').join('');
+}
+
+$('mood-scale').addEventListener('click', async e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const score = Number(btn.dataset.score);
+  const d = await (await api.post('/api/quicklog',
+    { action: 'mood', value: score })).json();
+  if (!d.ok) { toast(d.message, 'warn'); return; }
+  renderMoodScale(score);
+  toast('Logged ' + score + ' out of 10, ' + MOOD_WORDS[score].toLowerCase() + '.');
+  refreshToday();
+});
+
+/* ---------------- profile ---------------- */
+
+async function loadProfile() {
+  const d = await api.get('/api/profile');
+  const sel = $('in-activity');
+  sel.innerHTML = Object.entries(d.activity_levels).map(pair =>
+    '<option value="' + pair[0] + '">' + escapeHtml(pair[1]) + '</option>'
+  ).join('');
+  if (d.profile.age) $('in-age').value = d.profile.age;
+  if (d.profile.sex) $('in-sex').value = d.profile.sex;
+  if (d.profile.activity_level) sel.value = d.profile.activity_level;
+}
+
+$('profile-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const out = $('profile-out');
+  const d = await (await api.post('/api/profile', {
+    age: Number($('in-age').value) || null,
+    sex: $('in-sex').value || null,
+    activity_level: $('in-activity').value || null,
+  })).json();
+  out.className = d.ok ? 'result' : 'result is-error';
+  out.textContent = d.ok
+    ? 'Saved. The Review page can now estimate your energy needs.'
+    : d.errors[0];
+});
 
 /* ---------------- Progress ---------------- */
 
@@ -698,6 +826,8 @@ async function boot() {
   if (new URLSearchParams(location.search).get('voice') === '1') {
     location.hash = '#voice';
   }
+  renderMoodScale(null);
+  loadProfile().catch(() => { /* profile is optional */ });
   route();
 }
 
