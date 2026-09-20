@@ -1,0 +1,29 @@
+{
+  "name": "Health Coach",
+  "short_name": "Coach",
+  "description": "A multi-agent wellness assistant that correlates your sleep, hydration, nutrition, activity, mood and medication.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fbfbfa",
+  "theme_color": "#fbfbfa",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/static/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Talk to the coach",
+      "short_name": "Voice",
+      "description": "Open straight into voice input",
+      "url": "/?voice=1"
+    },
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "description": "Daily rings and quick logging",
+      "url": "/#today"
+    }
+  ]
+}

@@ -206,3 +206,50 @@ def clear_all() -> None:
     with connect() as conn:
         for t in tables:
             conn.execute(f"DELETE FROM {t}")
+
+
+# --- history series, for charts -----------------------------------------
+# One row per day with gaps preserved as None, so a chart can show a break
+# in logging rather than drawing a misleading straight line across it.
+
+SERIES = {
+    "sleep":    ("SELECT day, SUM(hours)    v FROM sleep    WHERE day >= ? GROUP BY day", "h"),
+    "water":    ("SELECT day, SUM(glasses)  v FROM water    WHERE day >= ? GROUP BY day", "glasses"),
+    "calories": ("SELECT day, SUM(calories) v FROM meals    WHERE day >= ? GROUP BY day", "kcal"),
+    "steps":    ("SELECT day, SUM(steps)    v FROM activity WHERE day >= ? GROUP BY day", "steps"),
+    "active":   ("SELECT day, SUM(minutes)  v FROM activity WHERE day >= ? GROUP BY day", "min"),
+    "mood":     ("SELECT day, AVG(score)    v FROM mood     WHERE day >= ? GROUP BY day", "/10"),
+}
+
+
+def series(metric: str, days: int = 14) -> dict:
+    """Return {'metric','unit','points':[{'day','value'}]} with gaps as None."""
+    if metric not in SERIES:
+        raise ValueError(f"unknown metric {metric!r}")
+    sql, unit = SERIES[metric]
+    rows = {r["day"]: r["v"] for r in query(sql, (days_ago(days - 1),))}
+
+    points = []
+    for offset in range(days - 1, -1, -1):
+        day = days_ago(offset)
+        value = rows.get(day)
+        points.append({
+            "day": day,
+            "value": round(value, 1) if isinstance(value, float) else value,
+        })
+    return {"metric": metric, "unit": unit, "points": points}
+
+
+def all_series(days: int = 14) -> dict:
+    return {name: series(name, days) for name in SERIES}
+
+
+def logged_days(days: int = 60) -> set[str]:
+    """Every day on which the user logged anything at all."""
+    tables = ("meals", "water", "sleep", "activity", "vitals", "mood", "med_log")
+    found: set[str] = set()
+    since = days_ago(days)
+    for table in tables:
+        for row in query(f"SELECT DISTINCT day FROM {table} WHERE day >= ?", (since,)):
+            found.add(row["day"])
+    return found

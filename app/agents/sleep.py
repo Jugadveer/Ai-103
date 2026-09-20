@@ -21,15 +21,17 @@ class SleepAgent(BaseAgent):
 
     def report(self) -> dict:
         rows = db.query(
-            "SELECT hours FROM sleep ORDER BY day DESC LIMIT 7"
+            "SELECT day, hours FROM sleep ORDER BY day DESC LIMIT 7"
         )
         hours = [r["hours"] for r in rows]
+        last_night = rows[0]["hours"] if rows else 0
         nights = len(hours)
         avg = round(sum(hours) / nights, 1) if nights else 0.0
         debt = round(max(0.0, (TARGET_HOURS * nights) - sum(hours)), 1)
         return {
             "has_data": nights > 0,
             "nights_logged": nights,
+            "last_night": last_night,
             "avg_hours": avg,
             "target": TARGET_HOURS,
             "debt_hours": debt,

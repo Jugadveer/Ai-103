@@ -7,9 +7,9 @@ DATA_AGENTS = ["hydration", "nutrition", "sleep", "activity",
                "vitals", "mood", "medication", "symptom"]
 
 
-def test_all_eleven_agents_register(bus):
-    assert len(bus.agents) == 11
-    for name in ["coach"] + DATA_AGENTS + ["insights", "report"]:
+def test_all_agents_register(bus):
+    assert len(bus.agents) == 12
+    for name in ["coach"] + DATA_AGENTS + ["progress", "insights", "report"]:
         assert name in bus.agents, f"{name} did not register"
 
 
