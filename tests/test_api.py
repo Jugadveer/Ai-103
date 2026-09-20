@@ -84,3 +84,17 @@ def test_invalid_value_is_rejected_with_a_readable_message(client):
                     json={"message": "I slept 500 hours"}).json()
     assert d["data"].get("rejected") is True
     assert "0.5" in d["reply"] and "18" in d["reply"]
+
+
+def test_speak_endpoint_degrades_cleanly_without_speech(client):
+    """
+    In MOCK_MODE there is no Speech key, so /api/speak must return 503 -
+    the signal the page uses to fall back to the browser's own voice.
+    """
+    r = client.post("/api/speak", json={"text": "hello"})
+    assert r.status_code == 503
+
+
+def test_speak_validates_input(client):
+    assert client.post("/api/speak", json={"text": ""}).status_code == 422
+    assert client.post("/api/speak", json={"text": "x" * 4000}).status_code == 422

@@ -331,12 +331,36 @@ $('chips').addEventListener('click', async e => {
 });
 
 // --- Voice -------------------------------------------------------------
-// Placeholder. Azure AI Speech replaces this once a key is set —
-// see app/services/speech.py, which already implements STT and TTS.
-function speak(text) {
-  if (!window.speechSynthesis || text.length > 600) return;
+// Azure AI Speech is used when configured. If /api/speak returns 503 the
+// service has no key, and we fall back to the browser's own voice so the
+// page still talks.
+let currentAudio = null;
+
+function browserSpeak(text) {
+  if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
   speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
+async function speak(text) {
+  if (!text || text.length > 3000) return;
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  speechSynthesis && speechSynthesis.cancel();
+
+  try {
+    const r = await fetch('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!r.ok) { browserSpeak(text); return; }   // 503 = Speech not configured
+    const url = URL.createObjectURL(await r.blob());
+    currentAudio = new Audio(url);
+    currentAudio.onended = () => URL.revokeObjectURL(url);
+    await currentAudio.play();
+  } catch (e) {
+    browserSpeak(text);
+  }
 }
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;

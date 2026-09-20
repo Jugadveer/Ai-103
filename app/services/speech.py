@@ -6,6 +6,7 @@ placeholder in the UI; these functions replace it once the Speech resource
 is provisioned. Keeping the interface here means only app/main.py changes.
 """
 from app import config
+from app.core import logging as log
 
 
 def _speech_config():
@@ -54,3 +55,31 @@ def text_to_speech(text: str, out_path: str = "reply.wav") -> str:
     except Exception as exc:
         print(f"[speech] TTS failed ({exc})")
         return ""
+
+
+def synthesize_bytes(text: str) -> bytes | None:
+    """
+    Synthesise speech and return WAV bytes, for serving over HTTP.
+
+    Returns None when Speech is not configured or the call fails, so the
+    caller can fall back to the browser's own voice.
+    """
+    if not available():
+        return None
+    try:
+        import azure.cognitiveservices.speech as speechsdk
+        from app.core.retry import with_retry
+
+        # audio_config=None keeps the audio in memory instead of a file.
+        synth = speechsdk.SpeechSynthesizer(
+            speech_config=_speech_config(), audio_config=None
+        )
+        result = with_retry(lambda: synth.speak_text_async(text).get(),
+                            label="azure_tts")
+        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            return result.audio_data
+        log.warn("tts_failed", reason=str(result.reason))
+        return None
+    except Exception as exc:
+        log.warn("tts_error", error=str(exc)[:120])
+        return None

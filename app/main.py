@@ -8,7 +8,7 @@ import pathlib
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from app import config
@@ -25,6 +25,7 @@ from app.agents.sleep import SleepAgent
 from app.agents.symptom import SymptomAgent
 from app.agents.vitals import VitalsAgent
 from app.core import logging as log
+from app.services import speech
 from app.store import db
 
 
@@ -113,6 +114,24 @@ def chat(req: ChatRequest):
         "trace": bus.trace,
         "disclaimer": config.DISCLAIMER,
     }
+
+
+class SpeakRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=3000)
+
+
+@app.post("/api/speak")
+def speak(req: SpeakRequest):
+    """
+    Azure AI Speech text-to-speech. Returns WAV audio.
+
+    A 503 here is not an error state - it tells the page that Speech is not
+    configured, and the page falls back to the browser's own voice.
+    """
+    audio = speech.synthesize_bytes(req.text)
+    if audio is None:
+        return Response(status_code=503)
+    return Response(content=audio, media_type="audio/wav")
 
 
 @app.get("/api/dashboard")

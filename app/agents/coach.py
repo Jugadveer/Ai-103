@@ -76,7 +76,9 @@ class CoachAgent(BaseAgent):
             return AgentReply(agent=self.name,
                               text="Tell me how you're doing and I'll help.")
 
-        # 1. Safety gate on everything the user says.
+        # 1. Safety gate on everything the user says. The local layers always
+        #    run; the Azure Content Safety layer is added further down, once we
+        #    know the message is free text rather than a recognised log command.
         verdict = safety.check(query)
         if not verdict["safe"]:
             log.warn("safety_block", reason=verdict["reason"],
@@ -117,7 +119,14 @@ class CoachAgent(BaseAgent):
         if intent in ("insights", "report"):
             return self._delegate(intent, query)
 
-        # 4. Route to a specialist.
+        # 4. Free text we could not classify - this is the only path where
+        #    harmful content can actually reach us, so pay for the deep check.
+        deep = safety.check(query, deep=True)
+        if not deep["safe"]:
+            log.warn("safety_block", reason=deep["reason"], matched=deep["matched"])
+            return AgentReply(agent=self.name, text=deep["message"],
+                              data={"blocked": True, "reason": deep["reason"]})
+
         return self._delegate(self._route(low), query)
 
     # --- logging --------------------------------------------------------

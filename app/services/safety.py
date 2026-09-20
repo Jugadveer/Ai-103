@@ -94,8 +94,19 @@ def _contains(text: str, terms: list[str]) -> str:
     return ""
 
 
-def check(text: str) -> dict:
-    """Return {'safe': bool, 'reason': str, 'matched': str, 'message': str}."""
+def check(text: str, deep: bool = False) -> dict:
+    """
+    Return {'safe': bool, 'reason': str, 'matched': str, 'message': str}.
+
+    Layers 1 and 2 (red flags, scope) are local and ALWAYS run - they cost
+    nothing and are the ones that matter clinically.
+
+    Layer 3 (Azure Content Safety) costs a network round-trip of roughly
+    400ms, so it runs only when deep=True: for free-text the parser could
+    not classify, which is the only place harmful content can actually
+    reach. A recognised "I drank 3 glasses" needs no such check, and
+    paying 400ms for it would make every interaction sluggish.
+    """
     low = (text or "").lower()
 
     matched = _contains(low, RED_FLAGS)
@@ -108,7 +119,7 @@ def check(text: str) -> dict:
         return {"safe": False, "reason": "out_of_scope", "matched": matched,
                 "message": SCOPE_MESSAGE}
 
-    if content_safety_flags(text):
+    if deep and content_safety_flags(text):
         return {"safe": False, "reason": "content_safety", "matched": "azure",
                 "message": HARMFUL_MESSAGE}
 
