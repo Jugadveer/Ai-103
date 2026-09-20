@@ -3,293 +3,498 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Health Coach — AI-103</title>
+<title>Health Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* ---------------------------------------------------------------
+     One theme, locked: paper and ink. Chosen over dark mode because
+     this is presented on a classroom projector, where light surfaces
+     hold contrast far better.
+     One accent (deep green) for structure and agents.
+     One signal colour (red) reserved strictly for medical escalation.
+     One radius: none. Clinical instruments do not have rounded corners.
+     --------------------------------------------------------------- */
   :root {
-    --bg: #0f1419;
-    --panel: #171d25;
-    --sunk: #0d1117;
-    --line: #262f3a;
-    --text: #e6edf3;
-    --muted: #8b98a5;
-    --accent: #4da3ff;
-    --ok: #3fb950;
-    --warn: #d29922;
-    --danger: #f85149;
+    --paper:      #fbfbfa;
+    --paper-sunk: #f2f3f1;
+    --ink:        #14161a;
+    --ink-soft:   #575c58;
+    --ink-faint:  #8b918c;
+    --rule:       #dfe2de;
+    --rule-soft:  #ebedea;
+    --accent:     #0c6b4f;
+    --accent-wash:#e6f0ec;
+    --signal:     #b42318;
+    --signal-wash:#fdf0ee;
+    --warn:       #9a6700;
+
+    --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
   }
+
   * { box-sizing: border-box; }
+
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0; min-height: 100dvh;
+    display: flex; flex-direction: column;
+    /* desktop turns this into a fixed-height shell, see the media query */
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 15px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* numbers always tabular so readouts do not jitter as they update */
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- masthead ---------- */
   header {
-    padding: 16px 24px; border-bottom: 1px solid var(--line);
-    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 14px 28px; border-bottom: 1px solid var(--ink);
   }
-  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-  header .sub { color: var(--muted); font-size: 13px; }
-  header .mode {
-    margin-left: auto; font-size: 11px; color: var(--muted);
-    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+  header h1 {
+    margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em;
   }
-  .layout {
-    display: grid; grid-template-columns: 1fr 390px;
-    gap: 16px; padding: 16px; max-width: 1340px; margin: 0 auto;
+  header .role { font-size: 13px; color: var(--ink-soft); }
+  header .status {
+    margin-left: auto; font-family: var(--mono); font-size: 11px;
+    color: var(--ink-soft);
   }
-  @media (max-width: 940px) { .layout { grid-template-columns: 1fr; } }
-  .panel {
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: 10px; padding: 16px; margin-bottom: 16px;
+  header .status b { color: var(--accent); font-weight: 600; }
+
+  /* ---------- asymmetric two-column shell ---------- */
+  .shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(330px, 0.85fr);
+    /* the working rows absorb the spare height; the footer stays its own size */
+    /* minmax(0,1fr), not 1fr: a bare 1fr resolves to minmax(auto,1fr) and
+       refuses to shrink below its content, pushing the page into overflow.
+       The thread scrolls instead. */
+    grid-template-rows: minmax(0, 1fr) auto;
+    flex: 1;          /* absorb whatever the header leaves, no magic numbers */
+    min-height: 0;
   }
-  .panel h2 {
-    margin: 0 0 12px; font-size: 12px; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--muted); font-weight: 600;
-    display: flex; align-items: center; gap: 8px;
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .rail {
+    border-left: 1px solid var(--ink);
+    background: var(--paper-sunk);
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
   }
-  .panel h2 .count {
-    background: var(--sunk); border: 1px solid var(--line);
-    border-radius: 999px; padding: 1px 8px; font-size: 11px;
-    letter-spacing: 0; text-transform: none;
+
+  /* ---------- readout strip: hairlines, no cards ---------- */
+  .readouts {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    border-bottom: 1px solid var(--rule);
   }
-  #log { height: 44vh; min-height: 260px; overflow-y: auto; padding-right: 6px; }
-  .msg { margin-bottom: 14px; }
-  .msg .who {
-    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--muted); margin-bottom: 3px;
+  .readout {
+    padding: 11px 16px; border-right: 1px solid var(--rule-soft);
   }
-  .msg .bubble {
-    background: #1c232c; padding: 10px 13px; border-radius: 8px;
-    border-left: 3px solid var(--accent); white-space: pre-wrap;
+  .readout:last-child { border-right: 0; }
+  .readout .label {
+    font-size: 9.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 500;
   }
-  .msg.user .bubble { background: #1d2a3a; }
-  .msg.blocked .bubble { border-left-color: var(--danger); background: #2a1a1a; }
-  .msg.rejected .bubble { border-left-color: var(--warn); }
-  .msg .bubble.mono {
-    font: 12px/1.6 ui-monospace, "Cascadia Code", Consolas, monospace;
+  .readout .value {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 19px; font-weight: 500; margin-top: 3px; letter-spacing: -0.02em;
   }
-  form { display: flex; gap: 8px; margin-top: 12px; }
-  input[type=text] {
-    flex: 1; background: var(--sunk); border: 1px solid var(--line);
-    color: var(--text); padding: 11px 13px; border-radius: 8px; font: inherit;
+  .readout.is-low .value { color: var(--warn); }
+  .readout.is-empty .value { color: var(--ink-faint); font-weight: 400; }
+
+  /* ---------- conversation ---------- */
+  .thread {
+    flex: 1; overflow-y: auto; padding: 22px 28px 8px;
+    display: flex; flex-direction: column; gap: 22px;
   }
-  input[type=text]:focus { outline: none; border-color: var(--accent); }
-  button {
-    background: var(--accent); color: #07121f; border: 0; font: inherit;
-    font-weight: 600; padding: 11px 16px; border-radius: 8px; cursor: pointer;
+  .turn { display: grid; grid-template-columns: 62px 1fr; gap: 16px; }
+  .turn .speaker {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-faint); padding-top: 4px;
   }
-  button.ghost { background: #232c37; color: var(--text); }
-  button:disabled { opacity: .5; cursor: default; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .chip {
-    background: #232c37; border: 1px solid var(--line); color: var(--muted);
-    font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  .turn .body { max-width: 66ch; white-space: pre-wrap; }
+  .turn.from-user .body { color: var(--ink-soft); }
+  .turn.from-user .speaker { color: var(--accent); }
+
+  /* escalation is the only place the signal colour is allowed */
+  .turn.is-blocked .body {
+    border-left: 2px solid var(--signal); padding-left: 14px;
+    background: var(--signal-wash); padding-top: 10px; padding-bottom: 10px;
+    padding-right: 14px; color: var(--signal); font-weight: 500;
   }
-  .chip:hover { color: var(--text); border-color: var(--accent); }
-  .chip.seed { border-color: #33415a; color: var(--accent); }
-  /* agent trace — the visible proof of cross-agent communication */
-  .hop {
-    font: 12px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
-    padding: 7px 9px; margin-bottom: 6px; border-radius: 6px;
-    background: var(--sunk); border: 1px solid var(--line);
-    animation: slide .25s ease both;
+  .turn.is-rejected .body {
+    border-left: 2px solid var(--warn); padding-left: 14px; color: var(--warn);
   }
-  @keyframes slide { from { opacity: 0; transform: translateX(-8px); } }
-  .hop .route { color: var(--accent); font-weight: 600; }
-  .hop .payload { color: var(--muted); display: block; margin-top: 2px;
-                  word-break: break-word; }
-  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .tile { background: var(--sunk); border: 1px solid var(--line);
-          border-radius: 8px; padding: 9px 11px; }
-  .tile .k { font-size: 10px; color: var(--muted); text-transform: uppercase;
-             letter-spacing: .05em; }
-  .tile .v { font-size: 18px; font-weight: 600; margin-top: 2px; }
-  .tile.low .v { color: var(--warn); }
-  .tile.none .v { color: var(--muted); font-weight: 400; }
-  .roster { display: flex; flex-wrap: wrap; gap: 5px; }
-  .pill {
-    font: 11px ui-monospace, Consolas, monospace; padding: 3px 8px;
-    border-radius: 999px; background: var(--sunk);
-    border: 1px solid var(--line); color: var(--muted);
-    transition: all .2s;
+  .turn .body.is-fixed {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+    background: var(--paper-sunk); padding: 14px 16px;
+    border-left: 2px solid var(--accent);
   }
-  .pill.active { border-color: var(--accent); color: var(--accent);
-                 background: #16283d; }
-  .empty { color: var(--muted); font-size: 13px; font-style: italic; }
-  footer { text-align: center; color: var(--muted); font-size: 12px;
-           padding: 6px 24px 26px; }
+
+  /* loading state matches the shape of the reply it replaces */
+  .turn.is-pending .body span {
+    display: block; height: 11px; background: var(--rule);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  .turn.is-pending .body span:nth-child(1) { width: 92%; }
+  .turn.is-pending .body span:nth-child(2) { width: 78%; margin-top: 8px;
+                                             animation-delay: .12s; }
+  .turn.is-pending .body span:nth-child(3) { width: 45%; margin-top: 8px;
+                                             animation-delay: .24s; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .42 } }
+
+  /* ---------- composer ---------- */
+  .composer { border-top: 1px solid var(--rule); padding: 14px 28px 18px; }
+  .composer form { display: flex; gap: 0; border: 1px solid var(--ink); }
+  .composer input {
+    flex: 1; border: 0; background: var(--paper); font: inherit;
+    padding: 12px 14px; color: var(--ink); min-width: 0;
+  }
+  .composer input::placeholder { color: var(--ink-faint); }
+  .composer input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .composer button {
+    border: 0; border-left: 1px solid var(--ink); font: inherit;
+    font-weight: 600; padding: 12px 20px; cursor: pointer;
+    background: var(--paper); color: var(--ink);
+    transition: background .15s, color .15s, transform .06s;
+    white-space: nowrap;
+  }
+  .composer button.primary { background: var(--ink); color: var(--paper); }
+  .composer button:hover:not(:disabled) { background: var(--accent); color: #fff; }
+  .composer button:active:not(:disabled) { transform: translateY(1px); }
+  .composer button:disabled { opacity: .4; cursor: default; }
+
+  .suggestions {
+    display: flex; flex-wrap: wrap; gap: 0 20px; margin-top: 13px;
+  }
+  .suggestions button {
+    background: none; border: 0; padding: 3px 0; cursor: pointer;
+    font: inherit; font-size: 12.5px; color: var(--ink-soft);
+    border-bottom: 1px solid transparent;
+  }
+  .suggestions button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  .suggestions button.is-seed { color: var(--accent); font-weight: 500; }
+
+  /* ---------- rail sections ---------- */
+  .rail section { border-bottom: 1px solid var(--rule); padding: 16px 20px; }
+  .rail section:last-child { border-bottom: 0; }
+  .rail h2 {
+    margin: 0 0 13px; font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-faint); font-weight: 600;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .rail h2 .tally {
+    margin-left: auto; font-family: var(--mono); letter-spacing: 0;
+    text-transform: none; color: var(--ink-soft);
+  }
+
+  /* ---------- the agent trace: a real call tree ---------- */
+  #trace { flex: 1; overflow-y: auto; }
+  .call { position: relative; padding: 0 0 0 0; }
+  .call + .call { margin-top: 9px; }
+  .call.depth-1 { padding-left: 22px; }
+  /* connector: vertical spine plus elbow into each child */
+  .call.depth-1::before {
+    content: ""; position: absolute; left: 7px; top: -9px; bottom: 50%;
+    border-left: 1px solid var(--rule);
+  }
+  .call.depth-1::after {
+    content: ""; position: absolute; left: 7px; top: 50%; width: 9px;
+    border-top: 1px solid var(--rule);
+  }
+  .call.depth-1.is-last::before { bottom: 50%; }
+  .call .hop {
+    font-family: var(--mono); font-size: 11.5px; font-weight: 600;
+    color: var(--accent); letter-spacing: -0.01em;
+  }
+  .call .hop .arrow { color: var(--ink-faint); margin: 0 5px; font-weight: 400; }
+  .call .payload {
+    font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft);
+    margin-top: 2px; word-break: break-word; line-height: 1.5;
+  }
+  .call .payload b { color: var(--ink); font-weight: 500; }
+
+  /* staggered entry: communicates the ORDER agents were consulted in */
+  @media (prefers-reduced-motion: no-preference) {
+    .call { animation: enter .34s cubic-bezier(.16,1,.3,1) both; }
+    @keyframes enter {
+      from { opacity: 0; transform: translateX(-7px); }
+      to   { opacity: 1; transform: none; }
+    }
+  }
+
+  .placeholder {
+    font-size: 12.5px; color: var(--ink-faint); line-height: 1.6;
+  }
+  .placeholder.is-quiet { color: var(--accent); }
+
+  /* ---------- roster ---------- */
+  .roster { display: flex; flex-wrap: wrap; gap: 5px 7px; }
+  .roster span {
+    font-family: var(--mono); font-size: 11px; padding: 2px 7px;
+    border: 1px solid var(--rule); color: var(--ink-faint); cursor: default;
+  }
+  .roster span.is-meta { border-style: dashed; }
+  .roster span.is-active {
+    border-color: var(--accent); color: var(--accent);
+    background: var(--accent-wash); font-weight: 500;
+  }
+
+  footer {
+    grid-column: 1 / -1; border-top: 1px solid var(--rule);
+    padding: 11px 28px; font-size: 11.5px; color: var(--ink-faint);
+  }
+
+  /* Desktop: lock the shell to the viewport so the thread and the trace
+     scroll independently. On mobile the page scrolls instead. */
+  @media (min-width: 901px) {
+    body { height: 100dvh; overflow: hidden; }
+    .rail { overflow-y: auto; }
+  }
+
+  /* ---------- mobile: single column, rail moves below ---------- */
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { border-left: 0; border-top: 1px solid var(--ink); }
+    .readouts { grid-template-columns: repeat(3, 1fr); }
+    .readout:nth-child(3n) { border-right: 0; }
+    .readout:nth-child(-n+3) { border-bottom: 1px solid var(--rule-soft); }
+    .thread { padding: 18px 16px 8px; max-height: 58vh; }
+    .composer { padding: 12px 16px 16px; }
+    .turn { grid-template-columns: 1fr; gap: 5px; }
+    header, footer { padding-left: 16px; padding-right: 16px; }
+  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>Health Coach</h1>
-  <span class="sub">Multi-agent wellness assistant · AI-103</span>
-  <span class="mode" id="mode">connecting…</span>
+  <span class="role">Multi-agent wellness assistant</span>
+  <span class="status" id="status">connecting</span>
 </header>
 
-<div class="layout">
-  <div>
-    <div class="panel">
-      <h2>Conversation</h2>
-      <div id="log">
-        <div class="msg">
-          <div class="who">Coach</div>
-          <div class="bubble">Hi. I coordinate a team of agents that track your sleep, water, meals, activity, vitals, mood and medication — and talk to each other when you tell me how you're feeling.
+<div class="shell">
+  <div class="main">
+    <div class="readouts" id="readouts"></div>
 
-I'm a wellness coach, not a doctor. I share general information only and never diagnose.</div>
-        </div>
+    <div class="thread" id="thread">
+      <div class="turn">
+        <div class="speaker">Coach</div>
+        <div class="body">I coordinate a team of specialists that track your sleep, water, meals, activity, vitals, mood and medication. When you tell me how you are feeling, they compare notes.
+
+I am a wellness coach, not a doctor. I share general information and never diagnose.</div>
       </div>
+    </div>
 
-      <form id="form">
-        <input type="text" id="input" autocomplete="off"
-               placeholder="Tell me how you're feeling, or log something…">
-        <button type="button" class="ghost" id="mic" title="Speak">Mic</button>
-        <button type="submit" id="send">Send</button>
+    <div class="composer">
+      <form id="composer">
+        <input type="text" id="entry" autocomplete="off"
+               placeholder="Log something, or tell me how you are feeling">
+        <button type="button" id="mic" title="Speak">Voice</button>
+        <button type="submit" class="primary" id="send">Send</button>
       </form>
-
-      <div class="chips" id="chips">
-        <span class="chip seed" data-seed="1">Load demo data</span>
-        <span class="chip">I drank 2 glasses of water</span>
-        <span class="chip">I slept 5 hours</span>
-        <span class="chip">I walked 3000 steps</span>
-        <span class="chip">my mood is 4 out of 10</span>
-        <span class="chip">blood pressure 130/85</span>
-        <span class="chip">I keep getting a headache in the afternoon</span>
-        <span class="chip">show me the patterns</span>
-        <span class="chip">make a summary for my doctor</span>
-        <span class="chip">how am I doing today?</span>
+      <div class="suggestions" id="suggestions">
+        <button data-seed="1" class="is-seed">Load a week of data</button>
+        <button>I drank 2 glasses of water</button>
+        <button>I slept 5 hours</button>
+        <button>my mood is 4 out of 10</button>
+        <button>blood pressure 130/85</button>
+        <button>I keep getting a headache in the afternoon</button>
+        <button>show me the patterns</button>
+        <button>make a summary for my doctor</button>
+        <button>how am I doing today?</button>
       </div>
     </div>
   </div>
 
-  <div>
-    <div class="panel">
-      <h2>Agent-to-agent trace <span class="count" id="hopcount">0 calls</span></h2>
-      <div id="trace"><div class="empty">Ask something — agent calls appear here.</div></div>
-    </div>
+  <aside class="rail">
+    <section style="flex:1; display:flex; flex-direction:column; min-height:220px">
+      <h2>Agent trace <span class="tally" id="tally">idle</span></h2>
+      <div id="trace">
+        <p class="placeholder">Ask a question. Every message one agent sends
+          another is recorded here.</p>
+      </div>
+    </section>
 
-    <div class="panel">
-      <h2>Today</h2>
-      <div class="tiles" id="tiles"></div>
-    </div>
-
-    <div class="panel">
-      <h2>Agents <span class="count" id="agentcount">—</span></h2>
+    <section>
+      <h2>Agents <span class="tally" id="roster-count"></span></h2>
       <div class="roster" id="roster"></div>
-    </div>
-  </div>
-</div>
+    </section>
+  </aside>
 
-<footer>
-  Student project for AI-103. Not a medical device — do not use for medical decisions.
-</footer>
+  <footer>
+    Student project for AI-103. Not a medical device. Do not use for medical decisions.
+  </footer>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
-const log = $('log'), trace = $('trace'), tiles = $('tiles');
-const roster = $('roster'), input = $('input'), send = $('send');
+const thread = $('thread'), trace = $('trace'), roster = $('roster');
+const entry = $('entry'), send = $('send');
 
-function addMsg(who, text, cls) {
+/* ---------- conversation ---------- */
+
+function addTurn(speaker, text, variant) {
   const el = document.createElement('div');
-  el.className = 'msg' + (who === 'You' ? ' user' : '') + (cls ? ' ' + cls : '');
-  el.innerHTML = '<div class="who"></div><div class="bubble"></div>';
-  el.querySelector('.who').textContent = who;
-  const bubble = el.querySelector('.bubble');
-  bubble.textContent = text;
-  // Reports are pre-formatted columns — keep them monospaced.
-  if (text.startsWith('HEALTH SUMMARY')) bubble.classList.add('mono');
-  log.appendChild(el);
-  log.scrollTop = log.scrollHeight;
+  el.className = 'turn' + (speaker === 'You' ? ' from-user' : '') +
+                 (variant ? ' ' + variant : '');
+  el.innerHTML = '<div class="speaker"></div><div class="body"></div>';
+  el.querySelector('.speaker').textContent = speaker;
+  const body = el.querySelector('.body');
+  body.textContent = text;
+  // The doctor summary is pre-formatted columns, so keep it monospaced.
+  if (text.startsWith('HEALTH SUMMARY')) body.classList.add('is-fixed');
+  thread.appendChild(el);
+  thread.scrollTop = thread.scrollHeight;
+  return el;
 }
+
+function addPending() {
+  const el = document.createElement('div');
+  el.className = 'turn is-pending';
+  el.innerHTML = '<div class="speaker">Coach</div>' +
+                 '<div class="body"><span></span><span></span><span></span></div>';
+  thread.appendChild(el);
+  thread.scrollTop = thread.scrollHeight;
+  return el;
+}
+
+/* ---------- agent trace, drawn as a call tree ---------- */
 
 function renderTrace(hops) {
-  $('hopcount').textContent = hops.length + (hops.length === 1 ? ' call' : ' calls');
+  $('tally').textContent = hops.length
+    ? hops.length + (hops.length === 1 ? ' call' : ' calls')
+    : 'idle';
   trace.innerHTML = '';
+
   if (!hops.length) {
-    trace.innerHTML = '<div class="empty">No agent calls — handled directly.</div>';
-    highlight([]);
+    trace.innerHTML = '<p class="placeholder is-quiet">No agent calls. ' +
+      'The coach answered directly.</p>';
+    markActive([]);
     return;
   }
+
+  // The first hop is the entry point; later hops from the same sender are
+  // its children. Indenting them shows the delegation, not just a log.
+  const root = hops[0].from;
   hops.forEach((h, i) => {
-    const facts = Object.entries(h.data)
-      .filter(([k]) => k !== 'has_data')
-      .slice(0, 3)
-      .map(([k, v]) => k + '=' + JSON.stringify(v)).join('  ');
     const el = document.createElement('div');
-    el.className = 'hop';
-    el.style.animationDelay = (i * 80) + 'ms';
-    el.innerHTML = '<span class="route"></span><span class="payload"></span>';
-    el.querySelector('.route').textContent = h.from + ' → ' + h.to;
-    el.querySelector('.payload').textContent = facts || h.reason;
+    const child = h.from !== root;
+    el.className = 'call' + (child ? ' depth-1' : '');
+    el.style.animationDelay = (i * 55) + 'ms';
+
+    const facts = Object.entries(h.data)
+      .filter(([k]) => k !== 'has_data' && k !== 'role' && k !== 'holds_data')
+      .slice(0, 3)
+      .map(([k, v]) => k + '=<b>' + escapeHtml(brief(v)) + '</b>')
+      .join('  ');
+
+    el.innerHTML =
+      '<div class="hop">' + escapeHtml(h.from) +
+        '<span class="arrow">&rarr;</span>' + escapeHtml(h.to) + '</div>' +
+      '<div class="payload">' + (facts || escapeHtml(h.reason)) + '</div>';
     trace.appendChild(el);
   });
-  highlight(hops.flatMap(h => [h.from, h.to]));
+
+  markActive(hops.flatMap(h => [h.from, h.to]));
 }
 
-function highlight(names) {
-  const active = new Set(names);
-  roster.querySelectorAll('.pill').forEach(p =>
-    p.classList.toggle('active', active.has(p.dataset.name)));
+// Keep each fact short enough to read at a glance during a live demo.
+function brief(value) {
+  if (Array.isArray(value)) {
+    if (!value.length) return '[]';
+    const first = String(value[0]);
+    const head = first.length > 28 ? first.slice(0, 28) + '…' : first;
+    return value.length > 1 ? `[${head} +${value.length - 1}]` : `[${head}]`;
+  }
+  const text = JSON.stringify(value);
+  return text.length > 34 ? text.slice(0, 34) + '…' : text;
 }
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function markActive(names) {
+  const live = new Set(names);
+  roster.querySelectorAll('span').forEach(el =>
+    el.classList.toggle('is-active', live.has(el.dataset.name)));
+}
+
+/* ---------- readouts ---------- */
+
+const READOUTS = [
+  ['Water',   d => d.hydration.glasses_today + '/' + d.hydration.target,
+              d => d.hydration.status === 'low',      d => true],
+  ['Kcal',    d => d.nutrition.calories_today,
+              d => d.nutrition.status === 'low',      d => true],
+  ['Sleep',   d => d.sleep.avg_hours + 'h',
+              d => d.sleep.status === 'poor',         d => d.sleep.has_data],
+  ['Debt',    d => d.sleep.debt_hours + 'h',
+              d => d.sleep.debt_hours > 3,            d => d.sleep.has_data],
+  ['Steps',   d => d.activity.steps_today,
+              d => d.activity.status === 'sedentary', d => d.activity.has_data],
+  ['Mood',    d => d.mood.avg_score + '/10',
+              d => d.mood.status === 'low',           d => d.mood.has_data],
+];
+
+async function refreshReadouts() {
+  try {
+    const d = await (await fetch('/api/dashboard')).json();
+    const box = $('readouts');
+    box.innerHTML = '';
+    READOUTS.forEach(([label, value, isLow, hasData]) => {
+      const present = hasData(d);
+      const el = document.createElement('div');
+      el.className = 'readout' + (!present ? ' is-empty'
+                                : isLow(d) ? ' is-low' : '');
+      el.innerHTML = '<div class="label"></div><div class="value"></div>';
+      el.querySelector('.label').textContent = label;
+      el.querySelector('.value').textContent = present ? value(d) : 'no data';
+      box.appendChild(el);
+    });
+  } catch (e) { /* server still starting */ }
+}
+
+/* ---------- roster and service status ---------- */
 
 async function loadRoster() {
   try {
     const rows = await (await fetch('/api/agents')).json();
-    $('agentcount').textContent = rows.length;
+    $('roster-count').textContent = rows.length + ' registered';
     roster.innerHTML = '';
     rows.forEach(r => {
       const el = document.createElement('span');
-      el.className = 'pill';
       el.dataset.name = r.name;
       el.textContent = r.name;
       el.title = r.description;
+      // meta-agents hold no data of their own; dashed border says so
+      if (r.name === 'insights' || r.name === 'report') el.classList.add('is-meta');
       roster.appendChild(el);
     });
+
     const h = await (await fetch('/api/health')).json();
     const live = Object.entries(h.azure).filter(([, on]) => on).map(([k]) => k);
-    $('mode').textContent = live.length
-      ? 'Azure: ' + live.join(', ')
-      : 'offline mode — no Azure keys set';
-  } catch (e) { $('mode').textContent = 'server unreachable'; }
+    $('status').innerHTML = live.length
+      ? 'Azure live <b>' + live.join(' / ') + '</b>'
+      : 'offline mode, no Azure keys set';
+  } catch (e) {
+    $('status').textContent = 'server unreachable';
+  }
 }
 
-function tile(k, v, low) {
-  const el = document.createElement('div');
-  el.className = 'tile' + (v === null ? ' none' : (low ? ' low' : ''));
-  el.innerHTML = '<div class="k"></div><div class="v"></div>';
-  el.querySelector('.k').textContent = k;
-  el.querySelector('.v').textContent = v === null ? '—' : v;
-  return el;
-}
-
-async function refreshTiles() {
-  try {
-    const d = await (await fetch('/api/dashboard')).json();
-    tiles.innerHTML = '';
-    [
-      ['Water', d.hydration.glasses_today + '/' + d.hydration.target,
-       d.hydration.status === 'low'],
-      ['Calories', d.nutrition.calories_today, d.nutrition.status === 'low'],
-      ['Avg sleep', d.sleep.has_data ? d.sleep.avg_hours + 'h' : null,
-       d.sleep.status === 'poor'],
-      ['Sleep debt', d.sleep.has_data ? d.sleep.debt_hours + 'h' : null,
-       d.sleep.debt_hours > 3],
-      ['Steps', d.activity.steps_today || null, d.activity.status === 'sedentary'],
-      ['Mood', d.mood.has_data ? d.mood.avg_score + '/10' : null,
-       d.mood.status === 'low'],
-      ['BMI', d.vitals.bmi, false],
-      ['Heart rate', d.vitals.heart_rate, d.vitals.status === 'attention'],
-      ['Meds due', d.medication.has_data ? d.medication.pending.length : null,
-       d.medication.status === 'missed'],
-    ].forEach(([k, v, low]) => tiles.appendChild(tile(k, v ?? null, low)));
-  } catch (e) { /* server not up yet */ }
-}
+/* ---------- send ---------- */
 
 async function ask(text) {
-  if (!text.trim()) return;
-  addMsg('You', text);
-  input.value = '';
+  if (!text.trim() || send.disabled) return;
+  addTurn('You', text);
+  entry.value = '';
   send.disabled = true;
+  const pending = addPending();
+
   try {
     const r = await fetch('/api/chat', {
       method: 'POST',
@@ -297,44 +502,47 @@ async function ask(text) {
       body: JSON.stringify({ message: text }),
     });
     const d = await r.json();
-    const cls = d.data && d.data.blocked ? 'blocked'
-              : d.data && d.data.rejected ? 'rejected' : '';
-    addMsg('Coach', d.reply, cls);
+    pending.remove();
+    const variant = d.data && d.data.blocked ? 'is-blocked'
+                  : d.data && d.data.rejected ? 'is-rejected' : '';
+    addTurn('Coach', d.reply, variant);
     renderTrace(d.trace || []);
     speak(d.reply);
-    refreshTiles();
+    refreshReadouts();
   } catch (e) {
-    addMsg('Coach', 'Could not reach the server. Is uvicorn running?');
+    pending.remove();
+    addTurn('Coach', 'I could not reach the server. Check that uvicorn is running.',
+            'is-rejected');
   }
   send.disabled = false;
-  input.focus();
+  entry.focus();
 }
 
-$('form').addEventListener('submit', e => { e.preventDefault(); ask(input.value); });
-
-// Implicit form submission is unreliable here, so handle Enter explicitly.
-input.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input.value); }
+$('composer').addEventListener('submit', e => { e.preventDefault(); ask(entry.value); });
+entry.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(entry.value); }
 });
 
-$('chips').addEventListener('click', async e => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
-  if (chip.dataset.seed) {
+$('suggestions').addEventListener('click', async e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.dataset.seed) {
+    btn.disabled = true;
     await fetch('/api/seed', { method: 'POST' });
-    addMsg('Coach', 'Demo data loaded — a week of short sleep, low fluids and '
-                  + 'a falling mood. Now ask about a headache.');
-    refreshTiles();
+    addTurn('Coach', 'Loaded a week of logs: short sleep, low fluids, a falling ' +
+                     'mood and one medication still pending. Now ask about a headache.');
+    refreshReadouts();
+    btn.disabled = false;
     return;
   }
-  ask(chip.textContent);
+  ask(btn.textContent);
 });
 
-// --- Voice -------------------------------------------------------------
-// Azure AI Speech is used when configured. If /api/speak returns 503 the
-// service has no key, and we fall back to the browser's own voice so the
-// page still talks.
-let currentAudio = null;
+/* ---------- voice ----------
+   Azure AI Speech when configured. A 503 means no key is set, and we fall
+   back to the browser voice so the page still talks. */
+
+let playing = null;
 
 function browserSpeak(text) {
   if (!window.speechSynthesis) return;
@@ -344,39 +552,38 @@ function browserSpeak(text) {
 
 async function speak(text) {
   if (!text || text.length > 3000) return;
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-  speechSynthesis && speechSynthesis.cancel();
-
+  if (playing) { playing.pause(); playing = null; }
+  if (window.speechSynthesis) speechSynthesis.cancel();
   try {
     const r = await fetch('/api/speak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
-    if (!r.ok) { browserSpeak(text); return; }   // 503 = Speech not configured
+    if (!r.ok) { browserSpeak(text); return; }
     const url = URL.createObjectURL(await r.blob());
-    currentAudio = new Audio(url);
-    currentAudio.onended = () => URL.revokeObjectURL(url);
-    await currentAudio.play();
-  } catch (e) {
-    browserSpeak(text);
-  }
+    playing = new Audio(url);
+    playing.onended = () => URL.revokeObjectURL(url);
+    await playing.play();
+  } catch (e) { browserSpeak(text); }
 }
 
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const mic = $('mic');
-if (SR) {
-  const rec = new SR();
+if (Recognition) {
+  const rec = new Recognition();
   rec.lang = 'en-IN';
   rec.onresult = e => ask(e.results[0][0].transcript);
-  mic.addEventListener('click', () => rec.start());
+  rec.onerror = () => { mic.textContent = 'Voice'; };
+  rec.onend = () => { mic.textContent = 'Voice'; };
+  mic.addEventListener('click', () => { mic.textContent = 'Listening'; rec.start(); });
 } else {
   mic.disabled = true;
-  mic.title = 'Speech recognition not supported in this browser';
+  mic.title = 'Speech recognition is not supported in this browser';
 }
 
 loadRoster();
-refreshTiles();
+refreshReadouts();
 </script>
 </body>
 </html>
