@@ -4,7 +4,7 @@
 python -m pytest tests/ -q
 ```
 
-**150 tests, all passing, in about 1.3 seconds.** No Azure credentials needed —
+**218 tests, all passing, in about 5 seconds.** No Azure credentials needed —
 the suite runs entirely in `MOCK_MODE` against a throwaway SQLite file.
 
 Testing, reliability and responsible AI carry 15% of the project grade, and
@@ -15,6 +15,8 @@ the safety tests below are the ones to demonstrate if asked.
 | Suite | Tests | Focus |
 |---|---|---|
 | `test_validation.py` | 24 | Plausible ranges for every health value |
+| `test_nutrition.py` | 41 | Food recognition, clarification, self-reported vitals |
+| `test_progress.py` | 22 | Streaks, achievements, history gaps, installable routes |
 | `test_nlu.py` | 41 | Intent classification and entity extraction |
 | `test_safety.py` | 29 | Emergency escalation and scope refusal |
 | `test_agents.py` | 30 | Each agent's calculations in isolation |
@@ -51,6 +53,10 @@ question to be asked in the viva.
 
 | Bug | Caught by | Fix |
 |---|---|---|
+| Plural food names matched nothing, so "two rotis" logged only the dal | `test_quantities_including_plurals` | Optional plural suffix in the matcher |
+| "that's all" failed to close a conversation, because the apostrophe normalised to a space | `test_closing_phrases_end_the_exchange` | Apostrophes are dropped, not spaced |
+| A sentence naming only foods routed to the symptom agent, having no nutrition keyword in it | `test_offline_logs_what_it_recognises` | Routing consults the food table |
+| Azure vision read a plain red square as "a sandwich and soup" | manual check during development | Photos propose and wait for confirmation; nothing is written unprompted |
 | `ran` matched inside "d**ran**k", so drinking water logged as exercise | `test_drank_is_not_mistaken_for_ran` | Word boundaries on every exercise verb |
 | "my face **is** drooping" bypassed the stroke red flag, because the term assumed adjacent words | `test_emergencies_are_escalated` | Multi-word safety terms now tolerate inserted filler words |
 | "my throat **is** closing up" bypassed the anaphylaxis red flag | same | same |

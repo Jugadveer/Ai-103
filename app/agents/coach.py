@@ -24,7 +24,8 @@ ROUTES = {
     "sleep": ["sleep", "slept", "tired", "insomnia", "rest", "nap", "awake",
               "bed", "drowsy", "exhausted"],
     "nutrition": ["eat", "ate", "meal", "food", "calorie", "lunch", "dinner",
-                  "breakfast", "snack", "hungry", "diet", "protein"],
+                  "breakfast", "snack", "hungry", "diet", "protein",
+                  "drank", "drink", "plate", "bowl", "portion", "serving"],
     "activity": ["exercise", "workout", "steps", "walk", "run", "gym", "yoga",
                  "active", "sedentary", "cycling", "swim"],
     "vitals": ["weight", "bmi", "blood pressure", "heart rate", "pulse",
@@ -91,12 +92,26 @@ class CoachAgent(BaseAgent):
                 data={"blocked": True, "reason": verdict["reason"]},
             )
 
-        # 2. Deterministic intent parsing.
+        # 2. An open clarification takes priority: the user is answering a
+        #    question, so the words mean something different than they would
+        #    on their own. Safety has already run above, which is the point
+        #    of doing this after the gate and not before it.
+        pending = self.bus.pending if self.bus else None
+        if pending is not None:
+            owner = self.bus.get(pending.agent)
+            if owner is not None and hasattr(owner, "continue_dialog"):
+                pending.turns += 1
+                self.bus.request(self.name, pending.agent,
+                                 reason=f"answer to: {pending.question[:60]}")
+                return owner.continue_dialog(query, pending.context)
+            self.bus.clear_followup()
+
+        # 3. Deterministic intent parsing.
         parsed = nlu.parse(query)
         intent = parsed["intent"]
         log.info("intent", intent=intent, confidence=parsed["confidence"])
 
-        # 3. Direct intents.
+        # 4. Direct intents.
         if intent == "help":
             return AgentReply(agent=self.name, text=HELP_TEXT)
 
@@ -107,7 +122,9 @@ class CoachAgent(BaseAgent):
             return self._log_bp(parsed)
 
         if intent == "log_meal":
-            return self._log_meal(parsed)
+            # Delegated, not written here: the nutrition agent may want to
+            # ask a question before it commits anything.
+            return self._delegate("nutrition", query)
 
         if intent == "add_medication":
             return self._add_medication(query)
@@ -121,7 +138,7 @@ class CoachAgent(BaseAgent):
         if intent in ("insights", "report", "progress"):
             return self._delegate(intent, query)
 
-        # 4. Free text we could not classify - this is the only path where
+        # 5. Free text we could not classify - this is the only path where
         #    harmful content can actually reach us, so pay for the deep check.
         deep = safety.check(query, deep=True)
         if not deep["safe"]:
@@ -221,6 +238,13 @@ class CoachAgent(BaseAgent):
 
     def _route(self, low: str) -> str:
         """Weighted keyword scoring, with the model only as a tiebreak."""
+        # A message naming actual foods is a meal, whatever words surround
+        # it. "I had a big mac and large fries" contains no nutrition
+        # keyword at all and was previously routed to the symptom agent.
+        from app.core import foods
+        if foods.find(low):
+            return "nutrition"
+
         scores = {
             agent: sum(len(kw) for kw in words if kw in low)
             for agent, words in ROUTES.items()

@@ -135,11 +135,12 @@ agent through the bus, and the bus records the exchange. Full detail in
 | **Azure AI Foundry / Azure OpenAI** | Agent reasoning and response generation |
 | **Azure AI Search** | RAG index over the curated health knowledge base |
 | **Azure AI Speech** | Speech-to-text input and text-to-speech replies |
+| **Azure OpenAI vision** | Reading a meal from a photograph |
 | **Azure AI Content Safety** | Responsible-AI guardrail on user input |
 
 ### AI-103 concepts applied
 
-- **Multi-agent systems** — eleven agents with distinct responsibilities
+- **Multi-agent systems** — twelve agents with distinct responsibilities
 - **Cross-agent communication** — a message bus with a full, inspectable trace
 - **Agent orchestration** — the Coach routes, delegates and synthesises
 - **RAG** — grounded answers from a curated knowledge base
@@ -182,7 +183,7 @@ python -m scripts.seed
 python -m pytest tests/ -q
 ```
 
-**150 tests, all passing.** Full breakdown in [docs/TESTING.md](docs/TESTING.md).
+**218 tests, all passing.** Full breakdown in [docs/TESTING.md](docs/TESTING.md).
 
 | Suite | Tests | Covers |
 |---|---|---|

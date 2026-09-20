@@ -12,6 +12,9 @@ class AgentBus:
     def __init__(self):
         self.agents: dict = {}
         self.trace: list[dict] = []
+        # At most one open clarification across the whole system. See
+        # app/core/dialog.py for why only one.
+        self.pending = None
 
     def register(self, agent) -> None:
         agent.bus = self
@@ -54,3 +57,16 @@ class AgentBus:
 
     def reset_trace(self) -> None:
         self.trace = []
+
+    # --- open clarifications -------------------------------------------
+
+    def ask_followup(self, agent: str, kind: str, question: str,
+                     context: dict | None = None):
+        """An agent parks what it knows and waits for one more answer."""
+        from app.core.dialog import Pending
+        self.pending = Pending(agent=agent, kind=kind, question=question,
+                               context=context or {})
+        return self.pending
+
+    def clear_followup(self) -> None:
+        self.pending = None

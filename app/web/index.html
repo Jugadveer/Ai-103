@@ -38,11 +38,12 @@
     <a href="#coach"    data-route="coach"><span class="glyph">02</span>Coach</a>
     <a href="#voice"    data-route="voice"><span class="glyph">03</span>Voice</a>
     <a href="#trends"   data-route="trends"><span class="glyph">04</span>Trends</a>
-    <a href="#progress" data-route="progress"><span class="glyph">05</span>Progress</a>
-    <a href="#report"   data-route="report"><span class="glyph">06</span>Report</a>
+    <a href="#body"     data-route="body"><span class="glyph">05</span>Body</a>
+    <a href="#progress" data-route="progress"><span class="glyph">06</span>Progress</a>
+    <a href="#report"   data-route="report"><span class="glyph">07</span>Report</a>
     <div class="divider"></div>
     <div class="section-label">Under the hood</div>
-    <a href="#agents"   data-route="agents"><span class="glyph">07</span>Agents</a>
+    <a href="#agents"   data-route="agents"><span class="glyph">08</span>Agents</a>
   </div>
 
   <div class="nav-foot">
@@ -106,9 +107,11 @@ I am a wellness coach, not a doctor. I share general information and never diagn
     </div>
 
     <div class="composer">
+      <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
       <form id="composer">
         <input type="text" id="entry" autocomplete="off"
                placeholder="Log something, or tell me how you are feeling">
+        <button type="button" id="photo-btn" title="Log a meal from a photo">Photo</button>
         <button type="button" id="mic-inline">Speak</button>
         <button type="submit" class="primary" id="send">Send</button>
       </form>
@@ -143,6 +146,80 @@ I am a wellness coach, not a doctor. I share general information and never diagn
          itself worth seeing.</p>
     </div>
     <div class="charts" id="charts"></div>
+  </section>
+
+  <!-- ============ BODY ============ -->
+  <section class="page" id="page-body">
+    <div class="page-head">
+      <h2>Body</h2>
+      <p>Measurements you enter yourself. This app has no sensors and no
+         wearable, so nothing on this page is measured for you. BMI is the
+         one exception, because it is arithmetic on the two numbers below.</p>
+    </div>
+
+    <div class="section-title">BMI calculator</div>
+    <form class="entry-form" id="bmi-form">
+      <label>Height
+        <span class="unit">cm</span>
+        <input type="number" id="in-height" min="100" max="250" step="1"
+               inputmode="numeric" placeholder="175">
+      </label>
+      <label>Weight
+        <span class="unit">kg</span>
+        <input type="number" id="in-weight" min="20" max="300" step="0.1"
+               inputmode="decimal" placeholder="70">
+      </label>
+      <button class="btn primary" type="submit">Calculate and save</button>
+    </form>
+    <div id="bmi-out" class="result"></div>
+
+    <div class="section-title">Readings from a monitor or clinic</div>
+    <p class="placeholder" style="margin:-4px 0 12px">
+      Only fill these in if you have an actual reading. A home blood-pressure
+      cuff, a smartwatch, or a clinic visit. Leave blank otherwise.
+    </p>
+    <form class="entry-form" id="reading-form">
+      <label>Blood pressure
+        <span class="unit">mmHg</span>
+        <span class="pair">
+          <input type="number" id="in-sys" min="60" max="260" placeholder="120"
+                 inputmode="numeric">
+          <span class="sep">/</span>
+          <input type="number" id="in-dia" min="30" max="160" placeholder="80"
+                 inputmode="numeric">
+        </span>
+      </label>
+      <label>Resting heart rate
+        <span class="unit">bpm</span>
+        <input type="number" id="in-hr" min="30" max="220" placeholder="68"
+               inputmode="numeric">
+      </label>
+      <button class="btn primary" type="submit">Save readings</button>
+    </form>
+    <div id="reading-out" class="result"></div>
+
+    <div class="section-title">Activity, entered by hand</div>
+    <p class="placeholder" style="margin:-4px 0 12px">
+      There is no step counter here either. If your phone or watch tracks
+      steps, read the number off it and enter it below.
+    </p>
+    <form class="entry-form" id="activity-form">
+      <label>Steps today
+        <span class="unit">count</span>
+        <input type="number" id="in-steps" min="1" max="100000" placeholder="6500"
+               inputmode="numeric">
+      </label>
+      <label>Active minutes
+        <span class="unit">min</span>
+        <input type="number" id="in-active" min="1" max="600" placeholder="30"
+               inputmode="numeric">
+      </label>
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+    <div id="activity-out" class="result"></div>
+
+    <div class="section-title">On file</div>
+    <div class="readouts" id="body-readouts"></div>
   </section>
 
   <!-- ============ PROGRESS ============ -->

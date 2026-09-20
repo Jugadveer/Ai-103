@@ -526,3 +526,45 @@ button:disabled { opacity: .45; cursor: default; }
   .turn { grid-template-columns: 1fr; gap: 4px; }
   .mic-button { width: 132px; height: 132px; }
 }
+
+/* ---------- entry forms (Body page) ---------- */
+
+.entry-form {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+  border: 1px solid var(--rule); background: var(--paper);
+  padding: 14px 16px;
+}
+.entry-form label {
+  display: flex; flex-direction: column; gap: 4px; font-size: 12.5px;
+  font-weight: 500;
+}
+.entry-form .unit {
+  font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 600;
+}
+.entry-form input[type=number] {
+  width: 128px; border: 1px solid var(--rule); background: var(--paper-raise);
+  color: var(--ink); font: inherit; font-family: var(--mono);
+  font-variant-numeric: tabular-nums; padding: 8px 10px;
+}
+.entry-form input[type=number]:focus {
+  outline: 2px solid var(--accent); outline-offset: -2px;
+  border-color: var(--accent);
+}
+.entry-form .pair { display: flex; align-items: center; gap: 6px; }
+.entry-form .pair input { width: 78px; }
+.entry-form .pair .sep { color: var(--ink-faint); font-family: var(--mono); }
+
+.result { margin-top: 12px; font-size: 13.5px; min-height: 1.2em; }
+.result .headline {
+  font-family: var(--mono); font-size: 26px; font-weight: 600;
+  letter-spacing: -0.03em; color: var(--accent);
+}
+.result .band { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+.result.is-error { color: var(--warn); }
+.result .note { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
+
+.turn .shot {
+  margin-top: 8px; max-width: 220px; border: 1px solid var(--rule);
+  display: block;
+}

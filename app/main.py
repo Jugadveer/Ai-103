@@ -28,6 +28,7 @@ from app.agents.symptom import SymptomAgent
 from app.agents.vitals import VitalsAgent
 from app.core import logging as log
 from app.core.errors import ValidationError
+from app.services import llm as speech_llm
 from app.services import speech
 from app.store import db
 
@@ -209,6 +210,78 @@ def quicklog(req: QuickLog):
     except ValidationError as exc:
         return {"ok": False, "message": exc.user_message}
     return {"ok": True, "action": req.action}
+
+
+class PhotoRequest(BaseModel):
+    # A data URL from the browser. Capped so a huge upload cannot be used
+    # to run up the Azure bill or exhaust memory.
+    image: str = Field(min_length=32, max_length=8_000_000)
+
+
+@app.post("/api/photo")
+def photo(req: PhotoRequest):
+    """
+    Log a meal from a photograph.
+
+    Azure OpenAI vision names what is on the plate, then the nutrition
+    agent resolves it through exactly the same path as typed text, so a
+    photo and a sentence get the same validation and the same follow-up
+    questions.
+    """
+    if not req.image.startswith("data:image/"):
+        return {"ok": False, "message": "That did not look like an image."}
+
+    described = speech_llm.describe_food_photo(req.image)
+    if not described:
+        return {"ok": False,
+                "message": "I could not read that photo. Azure vision may be "
+                           "unavailable, or there may be no food in it. Tell "
+                           "me what you ate instead."}
+
+    bus.reset_trace()
+    reply = bus.get("nutrition").safe_handle_photo(described)
+    return {
+        "ok": True,
+        "saw": described,
+        "reply": reply.text,
+        "data": reply.data,
+        "trace": bus.trace,
+    }
+
+
+class VitalsEntry(BaseModel):
+    """
+    Self-reported body measurements. The app measures none of these; they
+    come from a scale, a tape measure, or a home blood-pressure monitor.
+    """
+    height_cm: float | None = None
+    weight_kg: float | None = None
+    heart_rate: float | None = None
+    systolic: float | None = None
+    diastolic: float | None = None
+
+
+@app.post("/api/vitals")
+def save_vitals(req: VitalsEntry):
+    saved, errors = [], []
+
+    def attempt(metric, value, secondary=None):
+        if value is None:
+            return
+        try:
+            db.add_vital(metric, value, secondary=secondary)
+            saved.append(metric)
+        except ValidationError as exc:
+            errors.append(exc.user_message)
+
+    attempt("height_cm", req.height_cm)
+    attempt("weight_kg", req.weight_kg)
+    attempt("heart_rate", req.heart_rate)
+    if req.systolic is not None and req.diastolic is not None:
+        attempt("systolic", req.systolic, secondary=req.diastolic)
+
+    return {"ok": not errors, "saved": saved, "errors": errors,
+            "vitals": bus.get("vitals").safe_report()}
 
 
 @app.post("/api/seed")

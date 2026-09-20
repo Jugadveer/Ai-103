@@ -38,6 +38,7 @@ const ROUTES = {
   coach:    () => $('entry').focus(),
   voice:    () => {},
   trends:   refreshTrends,
+  body:     refreshBody,
   progress: refreshProgress,
   report:   () => {},
   agents:   refreshAgents,
@@ -242,6 +243,113 @@ async function refreshTrends() {
   }).join('');
 }
 
+/* ---------------- Body ----------------
+   Nothing on this page is measured by the app. Every figure is a number
+   the user read off a scale, a cuff, or their phone. BMI is the one thing
+   computed here, because it is arithmetic on two of those numbers. */
+
+async function postVitals(payload, outId, onOk) {
+  const out = $(outId);
+  const d = await (await api.post('/api/vitals', payload)).json();
+  if (!d.ok) {
+    out.className = 'result is-error';
+    out.textContent = d.errors[0] || 'That did not look right.';
+    return null;
+  }
+  out.className = 'result';
+  onOk(d.vitals, out);
+  refreshBody();
+  return d.vitals;
+}
+
+$('bmi-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const height = Number($('in-height').value) || null;
+  const weight = Number($('in-weight').value) || null;
+  if (!height && !weight) {
+    $('bmi-out').className = 'result is-error';
+    $('bmi-out').textContent = 'Enter a height, a weight, or both.';
+    return;
+  }
+  await postVitals({ height_cm: height, weight_kg: weight }, 'bmi-out',
+    (v, out) => {
+      if (v.bmi) {
+        out.innerHTML = '<div class="headline">' + v.bmi + '</div>'
+          + '<div class="band">BMI, ' + escapeHtml(v.bmi_band) + '</div>'
+          + '<div class="note">A population screening figure, not a '
+          + 'diagnosis. It does not account for muscle, build or age.</div>';
+      } else {
+        out.textContent = 'Saved. Add your ' + v.missing_for_bmi
+          + ' to get a BMI.';
+      }
+    });
+});
+
+$('reading-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const sys = Number($('in-sys').value) || null;
+  const dia = Number($('in-dia').value) || null;
+  const hr = Number($('in-hr').value) || null;
+  const out = $('reading-out');
+  if ((sys && !dia) || (dia && !sys)) {
+    out.className = 'result is-error';
+    out.textContent = 'Blood pressure needs both numbers.';
+    return;
+  }
+  if (!sys && !hr) {
+    out.className = 'result is-error';
+    out.textContent = 'Enter a reading first.';
+    return;
+  }
+  await postVitals({ systolic: sys, diastolic: dia, heart_rate: hr },
+    'reading-out', (v, o) => {
+      o.innerHTML = v.flags.length
+        ? '<div class="band">' + escapeHtml(v.flags.join(' '))
+          + ' Worth mentioning to a doctor.</div>'
+        : '<div class="band">Saved. Those readings sit inside the usual '
+          + 'reference ranges.</div>';
+    });
+});
+
+$('activity-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const steps = Number($('in-steps').value) || 0;
+  const active = Number($('in-active').value) || 0;
+  if (!steps && !active) return;
+  const notes = [];
+  for (const pair of [['steps', steps], ['active', active]]) {
+    if (!pair[1]) continue;
+    const d = await (await api.post('/api/quicklog',
+      { action: pair[0], value: pair[1] })).json();
+    notes.push(d.ok ? pair[0] + ' recorded' : d.message);
+  }
+  $('activity-out').className = 'result';
+  $('activity-out').textContent = notes.join('. ') + '.';
+  $('in-steps').value = '';
+  $('in-active').value = '';
+  refreshBody();
+});
+
+async function refreshBody() {
+  const d = await api.get('/api/dashboard');
+  const v = d.vitals, a = d.activity;
+  const rows = [
+    ['Height', v.height_cm ? v.height_cm + ' cm' : null],
+    ['Weight', v.weight_kg ? v.weight_kg + ' kg' : null],
+    ['BMI', v.bmi],
+    ['Blood pressure', v.blood_pressure],
+    ['Heart rate', v.heart_rate ? v.heart_rate + ' bpm' : null],
+    ['Steps today', a.steps_today || null],
+    ['Active today', a.minutes_today ? a.minutes_today + ' min' : null],
+  ];
+  $('body-readouts').innerHTML = rows.map(row =>
+    '<div class="readout' + (row[1] ? '' : ' is-empty') + '">'
+    + '<div class="label">' + escapeHtml(row[0]) + '</div>'
+    + '<div class="value">'
+    + (row[1] ? escapeHtml(row[1]) : 'not entered') + '</div></div>'
+  ).join('');
+}
+
 /* ---------------- Progress ---------------- */
 
 async function refreshProgress() {
@@ -424,6 +532,51 @@ $('suggestions').addEventListener('click', async e => {
     return;
   }
   send(btn.textContent);
+});
+
+/* ---------------- photo ----------------
+   Azure OpenAI vision names what is on the plate. It proposes rather than
+   logs, because vision can be confidently wrong. */
+
+$('photo-btn').addEventListener('click', () => $('photo-input').click());
+
+$('photo-input').addEventListener('change', async e => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (file.size > 6000000) {
+    addTurn('Coach', 'That image is too large. Try a smaller photo.',
+            'is-rejected');
+    return;
+  }
+
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  location.hash = '#coach';
+  const sent = addTurn('You', 'Sent a photo of my meal.');
+  const img = document.createElement('img');
+  img.className = 'shot';
+  img.src = dataUrl;
+  img.alt = 'The meal photo you sent';
+  sent.querySelector('.body').appendChild(img);
+
+  const pending = addPending();
+  try {
+    const d = await (await api.post('/api/photo', { image: dataUrl })).json();
+    pending.remove();
+    if (!d.ok) { addTurn('Coach', d.message, 'is-rejected'); return; }
+    state.trace = d.trace || [];
+    addTurn('Coach', d.reply, '', d.trace);
+    speak(d.reply);
+  } catch (err) {
+    pending.remove();
+    addTurn('Coach', 'I could not send that photo.', 'is-rejected');
+  }
 });
 
 /* ---------------- voice ----------------
