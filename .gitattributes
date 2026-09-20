@@ -1,0 +1,4 @@
+# Keep line endings consistent across machines
+* text=auto eol=lf
+*.png binary
+*.wav binary

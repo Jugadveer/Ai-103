@@ -1,0 +1,31 @@
+# Secrets - NEVER commit these (AI-103 requirement)
+.env
+.env.local
+*.key
+*.pem
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Data / runtime
+*.db
+*.sqlite3
+data/audio/
+*.wav
+*.mp3
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local Claude tooling - not part of the submission
+.claude/

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Health Coach — AI-103</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #171d25;
+    --sunk: #0d1117;
+    --line: #262f3a;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --accent: #4da3ff;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --danger: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    padding: 16px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .mode {
+    margin-left: auto; font-size: 11px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+  }
+  .layout {
+    display: grid; grid-template-columns: 1fr 390px;
+    gap: 16px; padding: 16px; max-width: 1340px; margin: 0 auto;
+  }
+  @media (max-width: 940px) { .layout { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px; margin-bottom: 16px;
+  }
+  .panel h2 {
+    margin: 0 0 12px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--muted); font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel h2 .count {
+    background: var(--sunk); border: 1px solid var(--line);
+    border-radius: 999px; padding: 1px 8px; font-size: 11px;
+    letter-spacing: 0; text-transform: none;
+  }
+  #log { height: 44vh; min-height: 260px; overflow-y: auto; padding-right: 6px; }
+  .msg { margin-bottom: 14px; }
+  .msg .who {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin-bottom: 3px;
+  }
+  .msg .bubble {
+    background: #1c232c; padding: 10px 13px; border-radius: 8px;
+    border-left: 3px solid var(--accent); white-space: pre-wrap;
+  }
+  .msg.user .bubble { background: #1d2a3a; }
+  .msg.blocked .bubble { border-left-color: var(--danger); background: #2a1a1a; }
+  .msg.rejected .bubble { border-left-color: var(--warn); }
+  .msg .bubble.mono {
+    font: 12px/1.6 ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  form { display: flex; gap: 8px; margin-top: 12px; }
+  input[type=text] {
+    flex: 1; background: var(--sunk); border: 1px solid var(--line);
+    color: var(--text); padding: 11px 13px; border-radius: 8px; font: inherit;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent); color: #07121f; border: 0; font: inherit;
+    font-weight: 600; padding: 11px 16px; border-radius: 8px; cursor: pointer;
+  }
+  button.ghost { background: #232c37; color: var(--text); }
+  button:disabled { opacity: .5; cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    background: #232c37; border: 1px solid var(--line); color: var(--muted);
+    font-size: 12px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+  .chip.seed { border-color: #33415a; color: var(--accent); }
+  /* agent trace — the visible proof of cross-agent communication */
+  .hop {
+    font: 12px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+    padding: 7px 9px; margin-bottom: 6px; border-radius: 6px;
+    background: var(--sunk); border: 1px solid var(--line);
+    animation: slide .25s ease both;
+  }
+  @keyframes slide { from { opacity: 0; transform: translateX(-8px); } }
+  .hop .route { color: var(--accent); font-weight: 600; }
+  .hop .payload { color: var(--muted); display: block; margin-top: 2px;
+                  word-break: break-word; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { background: var(--sunk); border: 1px solid var(--line);
+          border-radius: 8px; padding: 9px 11px; }
+  .tile .k { font-size: 10px; color: var(--muted); text-transform: uppercase;
+             letter-spacing: .05em; }
+  .tile .v { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .tile.low .v { color: var(--warn); }
+  .tile.none .v { color: var(--muted); font-weight: 400; }
+  .roster { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pill {
+    font: 11px ui-monospace, Consolas, monospace; padding: 3px 8px;
+    border-radius: 999px; background: var(--sunk);
+    border: 1px solid var(--line); color: var(--muted);
+    transition: all .2s;
+  }
+  .pill.active { border-color: var(--accent); color: var(--accent);
+                 background: #16283d; }
+  .empty { color: var(--muted); font-size: 13px; font-style: italic; }
+  footer { text-align: center; color: var(--muted); font-size: 12px;
+           padding: 6px 24px 26px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Health Coach</h1>
+  <span class="sub">Multi-agent wellness assistant · AI-103</span>
+  <span class="mode" id="mode">connecting…</span>
+</header>
+
+<div class="layout">
+  <div>
+    <div class="panel">
+      <h2>Conversation</h2>
+      <div id="log">
+        <div class="msg">
+          <div class="who">Coach</div>
+          <div class="bubble">Hi. I coordinate a team of agents that track your sleep, water, meals, activity, vitals, mood and medication — and talk to each other when you tell me how you're feeling.
+
+I'm a wellness coach, not a doctor. I share general information only and never diagnose.</div>
+        </div>
+      </div>
+
+      <form id="form">
+        <input type="text" id="input" autocomplete="off"
+               placeholder="Tell me how you're feeling, or log something…">
+        <button type="button" class="ghost" id="mic" title="Speak">Mic</button>
+        <button type="submit" id="send">Send</button>
+      </form>
+
+      <div class="chips" id="chips">
+        <span class="chip seed" data-seed="1">Load demo data</span>
+        <span class="chip">I drank 2 glasses of water</span>
+        <span class="chip">I slept 5 hours</span>
+        <span class="chip">I walked 3000 steps</span>
+        <span class="chip">my mood is 4 out of 10</span>
+        <span class="chip">blood pressure 130/85</span>
+        <span class="chip">I keep getting a headache in the afternoon</span>
+        <span class="chip">show me the patterns</span>
+        <span class="chip">make a summary for my doctor</span>
+        <span class="chip">how am I doing today?</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>Agent-to-agent trace <span class="count" id="hopcount">0 calls</span></h2>
+      <div id="trace"><div class="empty">Ask something — agent calls appear here.</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Today</h2>
+      <div class="tiles" id="tiles"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Agents <span class="count" id="agentcount">—</span></h2>
+      <div class="roster" id="roster"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Student project for AI-103. Not a medical device — do not use for medical decisions.
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = $('log'), trace = $('trace'), tiles = $('tiles');
+const roster = $('roster'), input = $('input'), send = $('send');
+
+function addMsg(who, text, cls) {
+  const el = document.createElement('div');
+  el.className = 'msg' + (who === 'You' ? ' user' : '') + (cls ? ' ' + cls : '');
+  el.innerHTML = '<div class="who"></div><div class="bubble"></div>';
+  el.querySelector('.who').textContent = who;
+  const bubble = el.querySelector('.bubble');
+  bubble.textContent = text;
+  // Reports are pre-formatted columns — keep them monospaced.
+  if (text.startsWith('HEALTH SUMMARY')) bubble.classList.add('mono');
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+function renderTrace(hops) {
+  $('hopcount').textContent = hops.length + (hops.length === 1 ? ' call' : ' calls');
+  trace.innerHTML = '';
+  if (!hops.length) {
+    trace.innerHTML = '<div class="empty">No agent calls — handled directly.</div>';
+    highlight([]);
+    return;
+  }
+  hops.forEach((h, i) => {
+    const facts = Object.entries(h.data)
+      .filter(([k]) => k !== 'has_data')
+      .slice(0, 3)
+      .map(([k, v]) => k + '=' + JSON.stringify(v)).join('  ');
+    const el = document.createElement('div');
+    el.className = 'hop';
+    el.style.animationDelay = (i * 80) + 'ms';
+    el.innerHTML = '<span class="route"></span><span class="payload"></span>';
+    el.querySelector('.route').textContent = h.from + ' → ' + h.to;
+    el.querySelector('.payload').textContent = facts || h.reason;
+    trace.appendChild(el);
+  });
+  highlight(hops.flatMap(h => [h.from, h.to]));
+}
+
+function highlight(names) {
+  const active = new Set(names);
+  roster.querySelectorAll('.pill').forEach(p =>
+    p.classList.toggle('active', active.has(p.dataset.name)));
+}
+
+async function loadRoster() {
+  try {
+    const rows = await (await fetch('/api/agents')).json();
+    $('agentcount').textContent = rows.length;
+    roster.innerHTML = '';
+    rows.forEach(r => {
+      const el = document.createElement('span');
+      el.className = 'pill';
+      el.dataset.name = r.name;
+      el.textContent = r.name;
+      el.title = r.description;
+      roster.appendChild(el);
+    });
+    const h = await (await fetch('/api/health')).json();
+    const live = Object.entries(h.azure).filter(([, on]) => on).map(([k]) => k);
+    $('mode').textContent = live.length
+      ? 'Azure: ' + live.join(', ')
+      : 'offline mode — no Azure keys set';
+  } catch (e) { $('mode').textContent = 'server unreachable'; }
+}
+
+function tile(k, v, low) {
+  const el = document.createElement('div');
+  el.className = 'tile' + (v === null ? ' none' : (low ? ' low' : ''));
+  el.innerHTML = '<div class="k"></div><div class="v"></div>';
+  el.querySelector('.k').textContent = k;
+  el.querySelector('.v').textContent = v === null ? '—' : v;
+  return el;
+}
+
+async function refreshTiles() {
+  try {
+    const d = await (await fetch('/api/dashboard')).json();
+    tiles.innerHTML = '';
+    [
+      ['Water', d.hydration.glasses_today + '/' + d.hydration.target,
+       d.hydration.status === 'low'],
+      ['Calories', d.nutrition.calories_today, d.nutrition.status === 'low'],
+      ['Avg sleep', d.sleep.has_data ? d.sleep.avg_hours + 'h' : null,
+       d.sleep.status === 'poor'],
+      ['Sleep debt', d.sleep.has_data ? d.sleep.debt_hours + 'h' : null,
+       d.sleep.debt_hours > 3],
+      ['Steps', d.activity.steps_today || null, d.activity.status === 'sedentary'],
+      ['Mood', d.mood.has_data ? d.mood.avg_score + '/10' : null,
+       d.mood.status === 'low'],
+      ['BMI', d.vitals.bmi, false],
+      ['Heart rate', d.vitals.heart_rate, d.vitals.status === 'attention'],
+      ['Meds due', d.medication.has_data ? d.medication.pending.length : null,
+       d.medication.status === 'missed'],
+    ].forEach(([k, v, low]) => tiles.appendChild(tile(k, v ?? null, low)));
+  } catch (e) { /* server not up yet */ }
+}
+
+async function ask(text) {
+  if (!text.trim()) return;
+  addMsg('You', text);
+  input.value = '';
+  send.disabled = true;
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+    });
+    const d = await r.json();
+    const cls = d.data && d.data.blocked ? 'blocked'
+              : d.data && d.data.rejected ? 'rejected' : '';
+    addMsg('Coach', d.reply, cls);
+    renderTrace(d.trace || []);
+    speak(d.reply);
+    refreshTiles();
+  } catch (e) {
+    addMsg('Coach', 'Could not reach the server. Is uvicorn running?');
+  }
+  send.disabled = false;
+  input.focus();
+}
+
+$('form').addEventListener('submit', e => { e.preventDefault(); ask(input.value); });
+
+// Implicit form submission is unreliable here, so handle Enter explicitly.
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input.value); }
+});
+
+$('chips').addEventListener('click', async e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  if (chip.dataset.seed) {
+    await fetch('/api/seed', { method: 'POST' });
+    addMsg('Coach', 'Demo data loaded — a week of short sleep, low fluids and '
+                  + 'a falling mood. Now ask about a headache.');
+    refreshTiles();
+    return;
+  }
+  ask(chip.textContent);
+});
+
+// --- Voice -------------------------------------------------------------
+// Placeholder. Azure AI Speech replaces this once a key is set —
+// see app/services/speech.py, which already implements STT and TTS.
+function speak(text) {
+  if (!window.speechSynthesis || text.length > 600) return;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const mic = $('mic');
+if (SR) {
+  const rec = new SR();
+  rec.lang = 'en-IN';
+  rec.onresult = e => ask(e.results[0][0].transcript);
+  mic.addEventListener('click', () => rec.start());
+} else {
+  mic.disabled = true;
+  mic.title = 'Speech recognition not supported in this browser';
+}
+
+loadRoster();
+refreshTiles();
+</script>
+</body>
+</html>

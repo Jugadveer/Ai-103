@@ -1,0 +1,15 @@
+# Keep this list small and boring on purpose.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+pydantic==2.10.4
+
+# Azure
+openai==1.59.6                        # Azure OpenAI client
+azure-search-documents==11.5.2        # RAG index
+azure-cognitiveservices-speech==1.42.0 # STT + TTS
+azure-ai-contentsafety==1.0.0         # responsible-AI guardrail
+
+# Testing
+pytest==8.3.4
+httpx==0.28.1
