@@ -4,7 +4,7 @@
 python -m pytest tests/ -q
 ```
 
-**307 tests, all passing, in about a minute.** No Azure credentials needed,
+**337 tests, all passing, in about a minute.** No Azure credentials needed,
 the suite runs entirely in `MOCK_MODE` against a throwaway SQLite file.
 
 Testing, reliability and responsible AI carry 15% of the project grade, and
@@ -23,7 +23,9 @@ the safety tests below are the ones to demonstrate if asked.
 | `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
 | `test_progress.py` | 28 | Streaks, achievements, the seeded dataset |
 | `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_auth.py` | 24 | Sign up, sign in, sessions, and the gate |
 | `test_api.py` | 16 | Every endpoint, plus deployment readiness |
+| `test_isolation.py` | 6 | That one account cannot see another's data |
 
 ## The tests that matter most
 
@@ -42,6 +44,19 @@ guardrail runs before routing, before peers, before any model call.
 **Cross-agent communication actually happens.**
 `test_symptom_queries_every_data_peer` asserts all seven data-holding agents
 appear in the trace after a single symptom question.
+
+**A forgotten filter cannot reach main.**
+`test_every_query_on_personal_data_filters_by_owner` parses every Python
+file in the app, pulls out every SQL string, and fails if one touches a
+table of personal data without a `user_id` condition. Behavioural tests can
+only check the paths someone thought to try; a query added to a new agent
+next month would pass all of them while serving the wrong person's numbers.
+
+**An endpoint cannot be added ungated.**
+`test_every_data_endpoint_requires_signing_in` walks FastAPI's own route
+table and asserts every `/api` route answers 401 without a session. Anything
+genuinely public has to be named in a list, so leaving a route open becomes
+a visible line in a diff.
 
 **The system extends without editing existing agents.**
 `test_adding_an_agent_extends_correlation_automatically` registers a brand-new
@@ -64,6 +79,7 @@ question to be asked in the viva.
 | "my throat **is** closing up" bypassed the anaphylaxis red flag | same | same |
 | With an empty database the app claimed "you're running low on food and fluids" | `test_insights_says_so_when_there_is_nothing` | Agents now report `has_data`; no pattern is asserted without evidence |
 | The doctor summary printed empty sections for domains with no data | `test_report_declines_when_data_is_thin` | Sections are gated on `has_data` |
+| A database written before accounts existed survived startup, because `CREATE TABLE IF NOT EXISTS` will not add a column, then failed on the first query | first run of `test_isolation.py` | Startup detects the old shape and moves the file aside rather than crashing |
 
 The two safety misses are the important ones. Both were false negatives on
 stroke and anaphylaxis presentations, which is exactly the failure mode that matters
@@ -81,6 +97,8 @@ symptom question and 9 for the report.
 Stated plainly rather than hidden:
 
 - No tests against live Azure services (everything runs in `MOCK_MODE`)
-- No load or concurrency testing, since the app is single-user by design
+- The suite runs against SQLite only. The Postgres path shares the same SQL
+  and is exercised by hand, not by CI
+- No load or concurrency testing
 - No browser automation; UI checks were manual
 - The knowledge base content itself is unverified placeholder text

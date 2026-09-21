@@ -53,12 +53,33 @@ the user should see a doctor.
 
 ## 5. Privacy and data handling
 
-- All health data stays in a **local SQLite file**. Nothing is uploaded to a
-  third party beyond the Azure API calls needed to generate a response.
-- No name, email, phone number or identity data is collected.
+- Health data lives in the app's own database, SQLite locally or Postgres
+  on a hosted deployment. Nothing is uploaded to a third party beyond the
+  Azure API calls needed to generate a response.
+- **Accounts collect a name, an email and a password, and nothing else.**
+  No phone number, no address, no date of birth. The name is used to greet
+  you and the email to sign you in.
+- The password is hashed with scrypt and a per-password salt. The plain
+  password is never stored, never logged, and never appears in an error
+  message. There is no route, admin or otherwise, that can read one back.
+- **One account cannot see another's record.** Every row carries its owner
+  and every query filters on it. That is easy to promise and easy to break
+  by forgetting one query, so `tests/test_isolation.py` reads every SQL
+  string in the codebase and fails the build if one touching personal data
+  has no owner condition, and `tests/test_auth.py` fails the build if any
+  endpoint answers without a session.
+- The session cookie holds a user id and an expiry, signed. It is httponly,
+  so a script on the page cannot read it, and samesite, so another site
+  cannot use it. It carries no health data.
 - `.env` is git-ignored; no key, token or connection string is ever committed.
   This is both a course requirement and basic practice.
 - The database file (`*.db`) is git-ignored so no personal log data is pushed.
+
+**Stated plainly:** stored records are not encrypted at rest beyond
+whatever the host provides, there is no password reset, and there is no
+way to export or delete an account from inside the app. Those are real
+gaps for anything handling health data, and they are listed here rather
+than left for someone to discover.
 
 ## 6. Fairness and reliability
 

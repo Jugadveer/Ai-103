@@ -131,11 +131,34 @@ is in [docs/RESPONSIBLE-AI.md](docs/RESPONSIBLE-AI.md).
 
 More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Accounts
+
+Everyone signs in. A health record belongs to one person, so the app was
+not much use while it held a single anonymous pile of data that anyone
+opening the page could read.
+
+Passwords are hashed with scrypt from the standard library, which is
+deliberately slow and memory hard, with a fresh salt per password so one
+cracked hash tells you nothing about the next. The session is a signed
+cookie carrying only a user id and an expiry, marked httponly so page
+scripts cannot read it and samesite so another site cannot ride on it.
+Nothing about a password is stored, logged or sent anywhere.
+
+Every table carries the owner. Rather than trusting ourselves to
+remember that in each new query, `tests/test_isolation.py` reads every
+SQL string in the codebase and fails the build if one touches personal
+data without saying whose. `tests/test_auth.py` walks the route table and
+fails if any endpoint answers without a session. Both catch the mistake
+at the moment it is written rather than after someone sees the wrong
+person's numbers.
+
 ## Built with
 
-Python 3.11, FastAPI and Uvicorn. SQLite through the standard library,
-with no ORM. The front end is plain HTML, CSS and JavaScript with no
-build step, which keeps every line readable. Tests are pytest.
+Python 3.11, FastAPI and Uvicorn. SQLite through the standard library
+with no ORM, or Postgres when `DATABASE_URL` is set: identical SQL, one
+small shim for the two things the dialects spell differently. The front
+end is plain HTML, CSS and JavaScript with no build step, which keeps
+every line readable. Tests are pytest.
 
 ### Azure services
 
@@ -172,20 +195,29 @@ python -m scripts.seed
 uvicorn app.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000>.
+Open <http://127.0.0.1:8000> and create an account, or sign in as
+`demo@local` / `demo1234`, which is what `python -m scripts.seed` makes.
+
+Ticking "start with a month of sample data" on the way in fills a new
+account with the same demo month, so the charts have something to show
+from the first screen.
 
 It runs with no Azure credentials at all. Leave `MOCK_MODE=true` and it
 falls back to local rules and a local knowledge file. Fill in the keys and
 set `MOCK_MODE=false` to bring the live services in.
 
-`python -m scripts.seed` writes a month of history so the charts and
-streaks have something to show. The data is deliberately shaped rather
-than random: sleep declines across the month, mood declines with it, and
-three days are missing so the gaps in the charts are real.
+`python -m scripts.seed` makes a local account and writes a month of
+history into it, so the charts and streaks have something to show. The
+data is deliberately shaped rather than random: sleep declines across the
+month, mood declines with it, and three days are missing so the gaps in
+the charts are real.
 
 Deploying it is its own subject, covered in
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The short version is that this
-app keeps state on disk, so a serverless host cannot hold its data.
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The short version: set
+`DATABASE_URL` to a Postgres connection string and `SECRET_KEY` to a
+random value. Without a database a hosted deployment loses accounts as
+well as logs, and the app says so in a banner rather than letting you
+find out.
 
 ## Tests
 
@@ -193,8 +225,8 @@ app keeps state on disk, so a serverless host cannot hold its data.
 python -m pytest tests/ -q
 ```
 
-307 tests, all passing, in about a minute. No Azure needed: the suite runs
-entirely offline.
+337 tests, all passing, in about a minute. No Azure needed: the suite runs
+entirely offline, against a throwaway SQLite file.
 
 | Suite | Tests | What it covers |
 |---|---|---|
@@ -207,7 +239,9 @@ entirely offline.
 | `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
 | `test_progress.py` | 28 | Streaks, achievements, the seeded dataset |
 | `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_auth.py` | 24 | Sign up, sign in, sessions, and the gate |
 | `test_api.py` | 16 | Every endpoint, plus deployment readiness |
+| `test_isolation.py` | 6 | That one account cannot see another's data |
 
 Writing them was worth it. They caught a stroke red flag that missed
 "my face is drooping" because the phrase assumed adjacent words, a
@@ -215,6 +249,11 @@ guardrail that was silently discarding good answers for containing the
 words "you have", and a cascade where one question was making nineteen
 agent calls instead of eight. None of those were visible by reading the
 code. [docs/TESTING.md](docs/TESTING.md) lists the rest.
+
+Two of them are less about finding a bug than about preventing a kind of
+one. The isolation test reads the SQL and the auth test reads the route
+table, so the mistakes they guard against fail the build the day someone
+makes them.
 
 ## What it cannot do
 
@@ -234,16 +273,18 @@ measurements, and the interface says so every time it shows one. Energy
 needs come from the Mifflin-St Jeor equation, which is routinely out by
 about ten percent and worse at the extremes of body composition.
 
-It is single user, with no accounts. The knowledge file is small and
-needs proper clinical sourcing. A web app also cannot listen for a wake
-word in the background, so voice still starts on a tap.
+There is no password reset and no email verification, so an account is
+only as recoverable as the password you remember. The knowledge file is
+small and needs proper clinical sourcing. A web app also cannot listen
+for a wake word in the background, so voice still starts on a tap.
 
 ## Where we would take it next
 
 Wearable integration so activity stops being self-reported. A knowledge
-base reviewed by an actual clinician. Multi-user accounts with encrypted
-records. Trend detection across months rather than days. Regional
-language support through Azure AI Translator.
+base reviewed by an actual clinician. Password reset and email
+verification, and encryption of the stored records rather than only the
+connection to them. Trend detection across months rather than days.
+Regional language support through Azure AI Translator.
 
 ## Acknowledgements
 

@@ -100,7 +100,8 @@ app/
     search.py            RAG, Azure AI Search with a local fallback
     llm.py               Azure OpenAI wrapper
   store/
-    db.py                SQLite, plain sqlite3
+    db.py                SQLite or Postgres, plain SQL
+    users.py             accounts and password hashing
   web/
     index.html           single-page UI
 data/health_kb/kb.json   knowledge base
