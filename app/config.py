@@ -38,11 +38,25 @@ AZURE_CONTENT_SAFETY_KEY = _get("AZURE_CONTENT_SAFETY_KEY")
 SEED_ON_EMPTY = _get("SEED_ON_EMPTY", "false").lower() == "true"
 
 
+# --- security ------------------------------------------------------------
+# Signs the session cookie. Must be set anywhere the app runs on more than
+# one process, because a per-process random key would sign out everyone
+# whose next request lands on a different instance.
+SECRET_KEY = _get("SECRET_KEY")
+SESSION_DAYS = int(_get("SESSION_DAYS", "30") or 30)
+
+
 # --- storage -------------------------------------------------------------
-# Serverless hosts give a read-only filesystem with one writable temp
-# directory, and the container is thrown away between requests. So the
-# path is resolved at startup rather than assumed, and the app reports
-# honestly whether anything it saves will still be there later.
+# Two backends. Set DATABASE_URL and everything goes to Postgres, which is
+# the only way a serverless deployment can keep anything: its filesystem is
+# thrown away between requests. With no DATABASE_URL it is SQLite on disk,
+# which is what runs locally.
+#
+# The SQLite path is resolved at startup rather than assumed, because a
+# read-only filesystem has to be discovered, not guessed, and the app says
+# plainly whether what you log will still be there tomorrow.
+DATABASE_URL = _get("DATABASE_URL")
+
 
 def _resolve_storage(preferred: str) -> tuple[str, bool]:
     """Return (path, persistent). Falls back to temp on a read-only disk."""
@@ -63,8 +77,12 @@ def _resolve_storage(preferred: str) -> tuple[str, bool]:
         return fallback, False
 
 
-DB_PATH, STORAGE_PERSISTENT = _resolve_storage(
-    _get("DB_PATH", "health_coach.db"))
+DB_PATH, _DISK_PERSISTENT = _resolve_storage(_get("DB_PATH", "health_coach.db"))
+
+# Postgres keeps data by definition. SQLite only does when the disk it
+# sits on outlives the request.
+STORAGE_PERSISTENT = bool(DATABASE_URL) or _DISK_PERSISTENT
+STORAGE_BACKEND = "postgres" if DATABASE_URL else "sqlite"
 
 # Shown in the UI and spoken in the first reply. Not medical advice.
 DISCLAIMER = (
