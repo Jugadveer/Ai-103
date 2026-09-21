@@ -914,9 +914,14 @@ function setListening(on, label) {
   }
 }
 
-function micHint(text) {
+function micHint(text, alsoToast) {
   const el = $('voice-hint');
   if (el) el.textContent = text || '';
+  // The hint sits in the strip above the thread, which scrolls out of
+  // view once a conversation gets going. Anyone who started voice from
+  // the composer button would never see why it failed, which is the bug
+  // this whole path exists to fix. So failures toast as well.
+  if (text && alsoToast !== false) toast(text, 'warn');
 }
 
 function encodeWav(samples, rate) {
@@ -978,7 +983,7 @@ async function startListening() {
   MIC.node.connect(MIC.ctx.destination);
 
   setListening(true);
-  micHint('Listening. Tap again when you have finished.');
+  micHint('Listening. Tap again when you have finished.', false);
 
   // A safety stop, so a forgotten recording does not run forever.
   MIC.timer = setTimeout(() => { if (MIC.on) stopListening(); }, 15000);
