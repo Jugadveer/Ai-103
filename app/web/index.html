@@ -34,17 +34,15 @@
   </div>
 
   <div class="nav-links">
-    <a href="#today"    data-route="today"><span class="glyph">01</span>Today</a>
-    <a href="#coach"    data-route="coach"><span class="glyph">02</span>Coach</a>
-    <a href="#voice"    data-route="voice"><span class="glyph">03</span>Voice</a>
-    <a href="#trends"   data-route="trends"><span class="glyph">04</span>Trends</a>
-    <a href="#review"   data-route="review"><span class="glyph">05</span>Review</a>
-    <a href="#body"     data-route="body"><span class="glyph">06</span>Body</a>
-    <a href="#progress" data-route="progress"><span class="glyph">07</span>Progress</a>
-    <a href="#report"   data-route="report"><span class="glyph">08</span>Report</a>
+    <a href="#today"    data-route="today">Today</a>
+    <a href="#coach"    data-route="coach">Talk to it</a>
+    <a href="#trends"   data-route="trends">My trends</a>
+    <a href="#progress" data-route="progress">My streak</a>
+    <a href="#body"     data-route="body">My body</a>
+    <a href="#review"   data-route="review">Full check-up</a>
+    <a href="#report"   data-route="report">For my doctor</a>
     <div class="divider"></div>
-    <div class="section-label">Under the hood</div>
-    <a href="#agents"   data-route="agents"><span class="glyph">09</span>Agents</a>
+    <a href="#agents"   data-route="agents" class="is-minor">How it works</a>
   </div>
 
   <div class="nav-foot">
@@ -62,13 +60,12 @@
   <section class="page" id="page-today">
     <div class="page-head">
       <h2>Today</h2>
-      <p>Close your five rings. Every number here comes from the agent that
-         owns that domain.</p>
+      <p>Five things to close each day. Tap anything below to log it.</p>
     </div>
 
     <div class="rings" id="rings"></div>
 
-    <div class="section-title">Log in one tap</div>
+    <div class="section-title">Quick add</div>
     <div class="quick" id="quick">
       <button data-action="water"  data-value="1">Water <span class="plus">+1 glass</span></button>
       <button data-action="meal"   data-value="400">Meal <span class="plus">+400 kcal</span></button>
@@ -81,10 +78,10 @@
       <span class="tally">self-reported, nothing here senses it</span></div>
     <div class="mood-scale" id="mood-scale"></div>
 
-    <div class="section-title">Where you stand</div>
+    <div class="section-title">The numbers</div>
     <div class="readouts" id="readouts"></div>
 
-    <div class="section-title">What the agents noticed
+    <div class="section-title">What I noticed
       <span class="tally" id="insight-count"></span></div>
     <div id="today-insights"><p class="placeholder">Checking for patterns.</p></div>
 
@@ -97,8 +94,18 @@
   <!-- ============ COACH ============ -->
   <section class="page is-flex" id="page-coach">
     <div class="page-head">
-      <h2>Coach</h2>
-      <p>Tell it how you are feeling. It asks the other agents before answering.</p>
+      <h2>Talk to it</h2>
+      <p>Say or type how you are feeling. It checks with the other agents
+         before it answers.</p>
+    </div>
+
+    <div class="voice-strip" id="voice-strip">
+      <button class="mic-button" id="mic-big" type="button">Tap to speak</button>
+      <div class="voice-said">
+        <div class="heard" id="heard"></div>
+        <div class="spoken" id="spoken">Or just type below.</div>
+        <div class="hint" id="voice-hint"></div>
+      </div>
     </div>
 
     <div class="thread" id="thread">
@@ -131,21 +138,10 @@ I am a wellness coach, not a doctor. I share general information and never diagn
     </div>
   </section>
 
-  <!-- ============ VOICE ============ -->
-  <section class="page is-flex" id="page-voice">
-    <div class="voice-stage">
-      <button class="mic-button" id="mic-big" type="button">Tap to speak</button>
-      <div class="heard" id="heard"></div>
-      <div class="spoken" id="spoken">Ask about your sleep, log a glass of water,
-        or describe how you are feeling.</div>
-      <div class="hint" id="voice-hint"></div>
-    </div>
-  </section>
-
   <!-- ============ TRENDS ============ -->
   <section class="page" id="page-trends">
     <div class="page-head">
-      <h2>Trends</h2>
+      <h2>My trends</h2>
       <p>Fourteen days. A gap means nothing was logged that day, which is
          itself worth seeing.</p>
     </div>
@@ -155,7 +151,7 @@ I am a wellness coach, not a doctor. I share general information and never diagn
   <!-- ============ REVIEW ============ -->
   <section class="page" id="page-review">
     <div class="page-head">
-      <h2>Review</h2>
+      <h2>Full check-up</h2>
       <p>The whole picture in one pass. Every other agent is consulted, your
          daily energy needs are estimated from what you have told us, and
          what you logged is checked against them. Observations only: it does
@@ -170,7 +166,7 @@ I am a wellness coach, not a doctor. I share general information and never diagn
   <!-- ============ BODY ============ -->
   <section class="page" id="page-body">
     <div class="page-head">
-      <h2>Body</h2>
+      <h2>My body</h2>
       <p>Measurements you enter yourself. This app has no sensors and no
          wearable, so nothing on this page is measured for you. BMI is the
          one exception, because it is arithmetic on the two numbers below.</p>
@@ -271,7 +267,7 @@ I am a wellness coach, not a doctor. I share general information and never diagn
   <!-- ============ PROGRESS ============ -->
   <section class="page" id="page-progress">
     <div class="page-head">
-      <h2>Progress</h2>
+      <h2>My streak</h2>
       <p>Streaks and achievements, all derived from what you actually logged.</p>
     </div>
 
@@ -287,18 +283,28 @@ I am a wellness coach, not a doctor. I share general information and never diagn
   <!-- ============ REPORT ============ -->
   <section class="page" id="page-report">
     <div class="page-head">
-      <h2>Report</h2>
-      <p>A factual summary you can hand to a clinician. It states what you
-         logged and draws no conclusions.</p>
+      <h2>For my doctor</h2>
+      <p>A one-page picture of the last month that you can show at an
+         appointment. It says what you logged and nothing more.</p>
     </div>
-    <button class="btn primary" id="build-report" type="button">Build summary</button>
-    <div id="report-out" style="margin-top:18px"></div>
+
+    <div class="report-actions">
+      <button class="btn primary" id="build-report" type="button">Build it</button>
+      <button class="btn subtle" id="copy-report" type="button" hidden>Copy as text</button>
+      <button class="btn subtle" id="print-report" type="button" hidden>Print</button>
+    </div>
+
+    <div id="report-visual"></div>
+    <details id="report-plain" hidden>
+      <summary>Plain text version</summary>
+      <div class="body is-fixed" id="report-text"></div>
+    </details>
   </section>
 
   <!-- ============ AGENTS ============ -->
   <section class="page" id="page-agents">
     <div class="page-head">
-      <h2>Agents</h2>
+      <h2>How it works</h2>
       <p>No agent reads another agent's data directly. It asks that agent
          through the bus, and every message is recorded here.</p>
     </div>

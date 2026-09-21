@@ -642,3 +642,113 @@ button:disabled { opacity: .45; cursor: default; }
   padding: 9px 32px; font-size: 12.5px; line-height: 1.5;
 }
 @media (max-width: 980px) { .notice { padding: 9px 16px; } }
+
+/* ---------- voice strip, folded into the Coach page ---------- */
+
+.voice-strip {
+  display: flex; align-items: center; gap: 18px;
+  border: 1px solid var(--rule); background: var(--paper);
+  padding: 14px 16px; margin-bottom: 16px;
+}
+.voice-strip .mic-button { width: 92px; height: 92px; flex: none; font-size: 13px; }
+.voice-strip .voice-said { min-width: 0; }
+.voice-strip .heard { font-size: 16px; font-weight: 500; min-height: 0; }
+.voice-strip .spoken { font-size: 13.5px; }
+.voice-strip .hint { margin-top: 4px; color: var(--warn); }
+
+.nav-links a.is-minor { font-size: 13px; color: var(--ink-faint); }
+
+/* ---------- the report sheet ---------- */
+
+.report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.report-sheet {
+  margin-top: 18px; border: 1px solid var(--rule); background: var(--paper);
+}
+.report-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; padding: 18px 20px; border-bottom: 2px solid var(--ink);
+}
+.report-title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.report-sub { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
+.report-stamp {
+  font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint); text-align: right; line-height: 1.5;
+  border: 1px solid var(--rule); padding: 5px 9px;
+}
+
+.rcards {
+  display: flex; flex-wrap: wrap; gap: 1px; background: var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.rcard { flex: 1 1 148px; background: var(--paper); padding: 14px 16px 12px; }
+.rcard-label {
+  font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 600;
+}
+.rcard-value {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 22px; font-weight: 600; margin-top: 3px; letter-spacing: -0.03em;
+}
+.rcard-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px;
+              line-height: 1.4; min-height: 2.6em; }
+.rcard-axis { font-size: 9px; color: var(--ink-faint); margin-top: 3px;
+              font-family: var(--mono); }
+.sparkline { display: block; width: 100%; height: 26px; margin-top: 6px; }
+.sparkline .spark { fill: var(--accent); opacity: .85; }
+.sparkline .spark.is-low { fill: var(--ink-faint); opacity: .45; }
+.sparkline .spark-gap { fill: var(--rule); }
+
+.report-section { padding: 16px 20px; border-bottom: 1px solid var(--rule-soft); }
+.report-section h4 {
+  margin: 0 0 9px; font-size: 9.5px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--ink-faint); font-weight: 600;
+}
+.report-line { margin: 0; font-size: 13.5px; color: var(--ink-soft);
+               max-width: 70ch; line-height: 1.55; }
+.rmeta { display: flex; flex-wrap: wrap; gap: 10px 30px; }
+.rmeta div { display: flex; flex-direction: column; gap: 1px; }
+.rmeta span { font-size: 11.5px; color: var(--ink-faint); }
+.rmeta b { font-family: var(--mono); font-size: 15px; font-weight: 600; }
+
+.symptom-list { list-style: none; margin: 0; padding: 0; }
+.symptom-list li {
+  font-size: 13.5px; padding: 5px 0; border-bottom: 1px solid var(--rule-soft);
+  display: flex; gap: 14px;
+}
+.symptom-list li:last-child { border-bottom: 0; }
+.symptom-list .when {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint);
+  min-width: 52px; padding-top: 1px;
+}
+
+.report-foot {
+  padding: 14px 20px; font-size: 11.5px; color: var(--ink-faint);
+  line-height: 1.55;
+}
+
+#report-plain summary {
+  cursor: pointer; font-size: 12.5px; color: var(--ink-faint);
+  margin-top: 16px; font-family: var(--mono);
+}
+#report-plain summary:hover { color: var(--accent); }
+#report-plain .body { margin-top: 10px; }
+
+@media print {
+  .nav, .report-actions, #report-plain, .notice { display: none !important; }
+  body { background: #fff; }
+  .report-sheet { border-color: #000; }
+}
+
+@media (max-width: 620px) {
+  .voice-strip { flex-direction: column; text-align: center; }
+  .report-head { flex-direction: column; }
+  .report-stamp { text-align: left; }
+}
+
+/* Status reads as a state, not a list of service names. The detail is
+   still there on hover for anyone who wants it. */
+.nav-foot .svc { font-family: var(--sans); font-size: 11.5px; }
+.nav-foot .svc b { color: var(--accent); font-weight: 400; }
+.nav-foot .svc .dim { color: var(--ink-faint); }
+.nav-links a .glyph { display: none; }

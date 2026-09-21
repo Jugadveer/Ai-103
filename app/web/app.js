@@ -36,7 +36,6 @@ function toast(message, kind) {
 const ROUTES = {
   today:    refreshToday,
   coach:    () => $('entry').focus(),
-  voice:    () => {},
   trends:   refreshTrends,
   body:     refreshBody,
   review:   refreshReviewPage,
@@ -517,20 +516,167 @@ async function refreshProgress() {
 
 /* ---------------- Report ---------------- */
 
-$('build-report').addEventListener('click', async e => {
-  e.target.disabled = true;
-  e.target.textContent = 'Building';
-  const r = await api.post('/api/chat', { message: 'make a summary for my doctor' });
-  const d = await r.json();
-  state.trace = d.trace || [];
-  $('report-out').innerHTML =
-    `<div class="turn"><div class="speaker"></div>
-       <div class="body is-fixed">${escapeHtml(d.reply)}</div></div>`;
-  e.target.disabled = false;
-  e.target.textContent = 'Rebuild summary';
+function sparkline(points, target, width, height) {
+  const values = points.map(p => p.value).filter(v => v !== null);
+  if (!values.length) return '';
+  const peak = Math.max(target, ...values) * 1.1;
+  const slot = width / points.length;
+  const bars = points.map((p, i) => {
+    const x = i * slot + slot * 0.18;
+    const w = slot * 0.64;
+    if (p.value === null) {
+      return `<rect class="spark-gap" x="${x.toFixed(1)}" y="${height - 1.5}"
+              width="${w.toFixed(1)}" height="1.5"/>`;
+    }
+    const h = Math.max(1.5, (p.value / peak) * height);
+    return `<rect class="spark${p.value < target ? ' is-low' : ''}"
+            x="${x.toFixed(1)}" y="${(height - h).toFixed(1)}"
+            width="${w.toFixed(1)}" height="${h.toFixed(1)}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"
+          class="sparkline" aria-hidden="true">${bars}</svg>`;
+}
+
+const REPORT_CARDS = [
+  { key: 'sleep',    label: 'Sleep', target: 7,
+    value: d => d.sleep.has_data ? d.sleep.avg_hours + 'h' : null,
+    note:  d => d.sleep.has_data
+      ? 'nightly average, ' + d.sleep.debt_hours + 'h of debt built up' : '' },
+  { key: 'water',    label: 'Water', target: 8,
+    value: d => d.hydration.glasses_today + ' glasses',
+    note:  () => 'today, against a target of 8' },
+  { key: 'calories', label: 'Food', target: 2000,
+    value: d => d.nutrition.calories_today + ' kcal',
+    note:  d => d.nutrition.meals_today + (d.nutrition.meals_today === 1
+      ? ' meal logged today' : ' meals logged today') },
+  { key: 'steps',    label: 'Steps', target: 8000,
+    value: d => d.activity.steps_today || 0,
+    note:  d => d.activity.minutes_week + ' active minutes this week' },
+  { key: 'mood',     label: 'Mood', target: 7,
+    value: d => d.mood.has_data ? d.mood.avg_score + ' / 10' : null,
+    note:  d => d.mood.has_data ? 'self-reported, trend ' + d.mood.trend : '' },
+];
+
+async function buildReport() {
+  const btn = $('build-report');
+  btn.disabled = true;
+  btn.textContent = 'Building';
+
+  const [dash, hist, chat] = await Promise.all([
+    api.get('/api/dashboard'),
+    api.get('/api/history?days=30'),
+    api.post('/api/chat', { message: 'make a summary for my doctor' })
+      .then(r => r.json()),
+  ]);
+
+  const today = new Date().toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const cards = REPORT_CARDS.map(c => {
+    const value = c.value(dash);
+    if (value === null) return '';
+    const series = hist[c.key];
+    return `<div class="rcard">
+      <div class="rcard-label">${escapeHtml(c.label)}</div>
+      <div class="rcard-value">${escapeHtml(value)}</div>
+      <div class="rcard-note">${escapeHtml(c.note(dash))}</div>
+      ${series ? sparkline(series.points, c.target, 140, 26) : ''}
+      <div class="rcard-axis">last 30 days</div>
+    </div>`;
+  }).join('');
+
+  const v = dash.vitals;
+  const vitalBits = [
+    v.weight_kg ? ['Weight', v.weight_kg + ' kg'] : null,
+    v.bmi ? ['BMI', v.bmi + ', ' + v.bmi_band] : null,
+    v.blood_pressure ? ['Blood pressure', v.blood_pressure + ' mmHg'] : null,
+    v.heart_rate ? ['Resting heart rate', v.heart_rate + ' bpm'] : null,
+  ].filter(Boolean);
+
+  const energyLine = (chat.reply.match(/ENERGY\s+(.+)/) || [])[1];
+
+  $('report-visual').innerHTML = `
+    <div class="report-sheet">
+      <div class="report-head">
+        <div>
+          <div class="report-title">Health summary</div>
+          <div class="report-sub">Prepared ${escapeHtml(today)}</div>
+        </div>
+        <div class="report-stamp">Self-reported<br>Not a clinical record</div>
+      </div>
+
+      <div class="rcards">${cards}</div>
+
+      ${vitalBits.length ? `<div class="report-section">
+        <h4>Measurements you entered</h4>
+        <div class="rmeta">${vitalBits.map(([k, val]) =>
+          `<div><span>${escapeHtml(k)}</span><b>${escapeHtml(val)}</b></div>`
+        ).join('')}</div>
+      </div>` : ''}
+
+      ${energyLine ? `<div class="report-section">
+        <h4>Energy</h4>
+        <p class="report-line">${escapeHtml(energyLine)}</p>
+      </div>` : ''}
+
+      ${dash.medication.has_data ? `<div class="report-section">
+        <h4>Medication</h4>
+        <p class="report-line">${escapeHtml(dash.medication.names.join(', '))},
+          taken on ${dash.medication.adherence_week_pct}% of days this week.
+          Adherence only. This app does not advise on medication.</p>
+      </div>` : ''}
+
+      ${renderSymptoms(chat.reply)}
+
+      <div class="report-foot">
+        Every figure here was entered by the patient. Nothing was measured by
+        a device. Calorie and energy figures are estimates. No diagnosis is
+        implied and no clinician has reviewed this.
+      </div>
+    </div>`;
+
+  $('report-text').textContent = chat.reply;
+  $('report-plain').hidden = false;
+  $('copy-report').hidden = false;
+  $('print-report').hidden = false;
+  btn.disabled = false;
+  btn.textContent = 'Rebuild';
+}
+
+function renderSymptoms(text) {
+  const block = text.split('REPORTED SYMPTOMS')[1];
+  if (!block) return '';
+  const rows = block.split('\n')
+    .map(l => l.trim())
+    .filter(l => /^\d{4}-\d{2}-\d{2}/.test(l))
+    .map(l => {
+      const day = l.slice(0, 10);
+      const note = l.slice(10).trim();
+      const when = new Date(day).toLocaleDateString('en-GB',
+        { day: 'numeric', month: 'short' });
+      return `<li><span class="when">${escapeHtml(when)}</span>
+              ${escapeHtml(note)}</li>`;
+    });
+  if (!rows.length) return '';
+  return `<div class="report-section">
+    <h4>What they reported feeling</h4>
+    <ul class="symptom-list">${rows.join('')}</ul>
+  </div>`;
+}
+
+$('build-report').addEventListener('click', buildReport);
+
+$('copy-report').addEventListener('click', async e => {
+  try {
+    await navigator.clipboard.writeText($('report-text').textContent);
+    e.target.textContent = 'Copied';
+    setTimeout(() => { e.target.textContent = 'Copy as text'; }, 1800);
+  } catch (err) { toast('Could not copy. Open the plain text version.', 'warn'); }
 });
 
-/* ---------------- Agents ---------------- */
+$('print-report').addEventListener('click', () => window.print());
+
+/* ---------------- Agents ---------------- *//* ---------------- Agents ---------------- */
 
 function brief(value) {
   if (Array.isArray(value)) {
@@ -737,49 +883,175 @@ async function speak(text) {
   } catch (e) { browserSpeak(text); }
 }
 
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recogniser = null, listening = false;
+/* ---------------- speech input ----------------
+   Recorded here and transcribed by Azure AI Speech.
 
-function setListening(on) {
-  listening = on;
-  $('mic-big').classList.toggle('is-listening', on);
-  $('mic-big').textContent = on ? 'Listening' : 'Tap to speak';
-  $('mic-inline').classList.toggle('is-listening', on);
-  $('mic-inline').textContent = on ? 'Listening' : 'Speak';
+   The browser's own SpeechRecognition was the only path before. On
+   desktop Chrome it needs to reach Google's servers, gives up quietly on
+   the first hiccup, and the only signal was the button springing back to
+   "Speak". That is indistinguishable from broken.
+
+   So: capture raw audio with the Web Audio API, write a WAV by hand
+   (MediaRecorder gives webm/opus, which Azure will not take), and post it.
+   Every failure now says what went wrong. */
+
+const MIC = { stream: null, ctx: null, node: null, chunks: [], on: false };
+const SAMPLE_RATE = 16000;      // what Azure Speech expects
+
+function setListening(on, label) {
+  MIC.on = on;
+  for (const id of ['mic-big', 'mic-inline']) {
+    const el = $(id);
+    if (!el) continue;
+    el.classList.toggle('is-listening', on);
+    el.textContent = label || (on ? 'Listening, tap to stop'
+                                  : (id === 'mic-big' ? 'Tap to speak' : 'Speak'));
+  }
 }
 
-function startListening() {
-  if (!recogniser || listening) return;
-  try { recogniser.start(); setListening(true); } catch (e) { setListening(false); }
+function micHint(text) {
+  const el = $('voice-hint');
+  if (el) el.textContent = text || '';
 }
 
-if (Recognition) {
-  recogniser = new Recognition();
-  recogniser.lang = 'en-IN';
-  recogniser.interimResults = false;
+function encodeWav(samples, rate) {
+  // 16-bit mono PCM with a 44-byte header.
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const ascii = (offset, text) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+  ascii(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  ascii(8, 'WAVE');
+  ascii(12, 'fmt ');
+  view.setUint32(16, 16, true);      // PCM header size
+  view.setUint16(20, 1, true);       // format: PCM
+  view.setUint16(22, 1, true);       // channels: mono
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);      // bits per sample
+  ascii(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const clamped = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+    offset += 2;
+  }
+  return new Blob([view], { type: 'audio/wav' });
+}
 
-  recogniser.onresult = async e => {
-    const said = e.results[0][0].transcript;
-    $('heard').textContent = said;
+async function startListening() {
+  if (MIC.on) { await stopListening(); return; }
+  micHint('');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    micHint('This browser cannot reach a microphone. Type instead.');
+    return;
+  }
+
+  try {
+    MIC.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    micHint(err && err.name === 'NotAllowedError'
+      ? 'Microphone permission was declined. Allow it in the address bar.'
+      : 'No microphone available. Type instead.');
+    return;
+  }
+
+  MIC.ctx = new (window.AudioContext || window.webkitAudioContext)(
+    { sampleRate: SAMPLE_RATE });
+  const source = MIC.ctx.createMediaStreamSource(MIC.stream);
+  MIC.node = MIC.ctx.createScriptProcessor(4096, 1, 1);
+  MIC.chunks = [];
+  MIC.node.onaudioprocess = e => {
+    MIC.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  source.connect(MIC.node);
+  MIC.node.connect(MIC.ctx.destination);
+
+  setListening(true);
+  micHint('Listening. Tap again when you have finished.');
+
+  // A safety stop, so a forgotten recording does not run forever.
+  MIC.timer = setTimeout(() => { if (MIC.on) stopListening(); }, 15000);
+}
+
+async function stopListening() {
+  if (!MIC.on) return;
+  clearTimeout(MIC.timer);
+  setListening(false, 'Transcribing');
+  micHint('');
+
+  try { MIC.node.disconnect(); } catch (e) { /* already gone */ }
+  try { MIC.stream.getTracks().forEach(t => t.stop()); } catch (e) { /* ditto */ }
+
+  const total = MIC.chunks.reduce((n, c) => n + c.length, 0);
+  const samples = new Float32Array(total);
+  let at = 0;
+  for (const chunk of MIC.chunks) { samples.set(chunk, at); at += chunk.length; }
+  const rate = MIC.ctx.sampleRate;
+  try { await MIC.ctx.close(); } catch (e) { /* already closed */ }
+  MIC.chunks = [];
+
+  if (total < rate * 0.4) {
+    setListening(false);
+    micHint('That was too short. Hold on a moment longer next time.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'audio/wav' },
+      body: encodeWav(samples, rate),
+    });
+    const d = await res.json();
+    setListening(false);
+
+    if (!d.ok) {
+      micHint(d.message || 'I could not transcribe that.');
+      // Browser speech as a second chance where it exists.
+      if (d.reason === 'speech_not_configured') browserListen();
+      return;
+    }
+
+    $('heard').textContent = d.text;
     $('spoken').textContent = 'Thinking';
     const onVoicePage = location.hash === '#voice';
-    const d = await send(said, { quiet: onVoicePage });
-    if (onVoicePage && d) $('spoken').textContent = d.reply;
-  };
-  recogniser.onerror = e => {
+    const reply = await send(d.text, { quiet: onVoicePage });
+    if (onVoicePage && reply) $('spoken').textContent = reply.reply;
+  } catch (err) {
     setListening(false);
-    $('voice-hint').textContent = e.error === 'not-allowed'
-      ? 'Microphone permission was declined.' : '';
-  };
-  recogniser.onend = () => setListening(false);
+    micHint('Could not reach the server to transcribe that.');
+  }
+}
 
-  $('mic-big').addEventListener('click', startListening);
-  $('mic-inline').addEventListener('click', startListening);
-} else {
-  $('mic-big').disabled = true;
-  $('mic-inline').disabled = true;
-  $('voice-hint').textContent =
-    'This browser does not support speech recognition. Chrome or Edge does.';
+/* Fallback only: used when Azure Speech is not configured. */
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function browserListen() {
+  if (!Recognition) return;
+  const rec = new Recognition();
+  rec.lang = 'en-IN';
+  rec.interimResults = false;
+  rec.onresult = async e => {
+    const said = e.results[0][0].transcript;
+    $('heard').textContent = said;
+    const onVoicePage = location.hash === '#voice';
+    const reply = await send(said, { quiet: onVoicePage });
+    if (onVoicePage && reply) $('spoken').textContent = reply.reply;
+  };
+  rec.onerror = e => micHint('Speech input failed: ' + (e.error || 'unknown') + '.');
+  rec.onend = () => setListening(false);
+  try { rec.start(); setListening(true); } catch (e) { setListening(false); }
+}
+
+for (const id of ['mic-big', 'mic-inline']) {
+  const el = $(id);
+  if (el) el.addEventListener('click', startListening);
 }
 
 /* ---------------- PWA install ---------------- */
@@ -829,8 +1101,11 @@ async function boot() {
     const h = await api.get('/api/health');
     const live = Object.entries(h.azure).filter(([, on]) => on).map(([k]) => k);
     $('svc').innerHTML = live.length
-      ? 'azure <b>' + live.join(' ') + '</b>'
-      : 'offline mode';
+      ? '<b>&#9679;</b> Connected'
+      : '<span class="dim">&#9679;</span> Working offline';
+    $('svc').title = live.length
+      ? 'Azure services in use: ' + live.join(', ')
+      : 'No Azure services configured, using local rules';
 
     // Say so when the host cannot keep data. Silently losing what someone
     // logged is worse than telling them it is a preview.

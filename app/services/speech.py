@@ -83,3 +83,52 @@ def synthesize_bytes(text: str) -> bytes | None:
     except Exception as exc:
         log.warn("tts_error", error=str(exc)[:120])
         return None
+
+
+def transcribe_wav(audio: bytes) -> tuple[str, str]:
+    """
+    Transcribe a WAV recording with Azure AI Speech.
+
+    Returns (text, reason). An empty text with a reason lets the caller
+    tell the user what actually happened rather than silently resetting
+    the microphone button, which was the old behaviour and looked like
+    the feature was broken.
+    """
+    if not available():
+        return "", "speech_not_configured"
+
+    import os
+    import tempfile
+
+    path = ""
+    try:
+        import azure.cognitiveservices.speech as speechsdk
+
+        # The SDK reads from a file, so the upload is staged in temp and
+        # removed immediately afterwards.
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as handle:
+            handle.write(audio)
+            path = handle.name
+
+        recognizer = speechsdk.SpeechRecognizer(
+            speech_config=_speech_config(),
+            audio_config=speechsdk.AudioConfig(filename=path),
+        )
+        result = recognizer.recognize_once()
+
+        if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+            log.info("transcribed", chars=len(result.text))
+            return result.text, "ok"
+        if result.reason == speechsdk.ResultReason.NoMatch:
+            return "", "no_speech"
+        log.warn("transcribe_failed", reason=str(result.reason))
+        return "", "failed"
+    except Exception as exc:
+        log.error("transcribe_error", error=str(exc)[:160])
+        return "", "error"
+    finally:
+        if path:
+            try:
+                os.remove(path)
+            except OSError:
+                pass

@@ -7,7 +7,7 @@ Open  :  http://127.0.0.1:8000
 import pathlib
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -176,6 +176,35 @@ def speak(req: SpeakRequest):
     if audio is None:
         return Response(status_code=503)
     return Response(content=audio, media_type="audio/wav")
+
+
+@app.post("/api/transcribe")
+async def transcribe(request: Request):
+    """
+    Speech to text through Azure AI Speech.
+
+    The browser's own SpeechRecognition was the only input path before,
+    and on desktop Chrome it stops on the first hiccup without saying
+    why. This gives a real transcript and a reason when it fails.
+    """
+    audio = await request.body()
+    if not audio or len(audio) < 1000:
+        return {"ok": False, "reason": "too_short",
+                "message": "I did not catch anything. Try holding the "
+                           "button while you speak."}
+    if len(audio) > 8_000_000:
+        return {"ok": False, "reason": "too_long",
+                "message": "That recording is too long."}
+
+    text, reason = speech.transcribe_wav(audio)
+    if not text:
+        return {"ok": False, "reason": reason, "message": {
+            "no_speech": "I could not make out any speech in that.",
+            "speech_not_configured": "Azure Speech is not configured here, "
+                                     "so I cannot transcribe.",
+        }.get(reason, "Something went wrong transcribing that.")}
+
+    return {"ok": True, "text": text}
 
 
 @app.get("/api/dashboard")
