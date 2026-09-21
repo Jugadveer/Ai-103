@@ -1,5 +1,25 @@
 # Deployment
 
+## What is running now
+
+Live at <https://health-coach-1.vercel.app>, on Vercel with a Neon
+Postgres attached through the Vercel marketplace integration. Functions
+run in Vercel's default region and the database sits in the same one, so
+the roughly thirty queries a dashboard makes do not cross an ocean.
+
+Verified end to end against that deployment: the gate refuses an
+unauthenticated request, two accounts cannot see each other's readings,
+data survives a new session, a symptom question fans out to eight agents,
+and the doctor summary builds from thirty days of history.
+
+Azure Database for PostgreSQL was tried first and abandoned. Nothing was
+wrong with the code: an Azure for Students subscription is blocked from
+provisioning in several regions, and the portal resets compute and
+authentication choices whenever the region changes, which is enough
+friction to be not worth it two days before a deadline. The app has no
+Azure-specific database code, so moving back later is only a change of
+`DATABASE_URL`.
+
 Two settings decide whether a deployment is real or a demo:
 
 | Variable | What happens without it |
