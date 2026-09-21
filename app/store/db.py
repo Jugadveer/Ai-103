@@ -159,11 +159,14 @@ def _postgres_pool():
                 from psycopg_pool import ConnectionPool
                 from psycopg.rows import dict_row
                 _pool = ConnectionPool(
-                    config.DATABASE_URL, min_size=1, max_size=5,
-                    # Few connections on purpose. A free Postgres does not
-                    # allow many, and on a serverless host every warm
-                    # instance holds its own pool, so a large max_size
-                    # here multiplies rather than shares.
+                    config.DATABASE_URL, min_size=0, max_size=4,
+                    # Few connections on purpose, and none while idle.
+                    # A burstable Postgres allows about fifty in total,
+                    # and on a serverless host every warm instance keeps
+                    # its own pool, so these numbers multiply rather than
+                    # share. min_size=0 means an instance nobody is using
+                    # holds nothing; it costs one connection setup on the
+                    # next request, which is cheaper than running out.
                     #
                     # check is the one that matters off a normal server. A
                     # serverless instance is frozen between requests and
