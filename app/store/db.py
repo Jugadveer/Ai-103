@@ -180,7 +180,26 @@ def _postgres_pool():
                     # thirty: a database that is genuinely down should say
                     # so while someone is still looking at the screen.
                     timeout=10,
-                    kwargs={"row_factory": dict_row}, open=True)
+                    kwargs={
+                        "row_factory": dict_row,
+                        # Hosted Postgres is usually reached through
+                        # PgBouncer in transaction mode, where consecutive
+                        # statements can land on different server
+                        # connections. psycopg prepares a statement after
+                        # it has run a few times, and the prepared version
+                        # only exists on the connection that made it, so
+                        # the pooler eventually routes a query to a
+                        # connection that has never heard of it and the
+                        # request dies with "prepared statement does not
+                        # exist". It appears only after some traffic,
+                        # which makes it look intermittent.
+                        #
+                        # Turning preparation off costs a little on
+                        # repeated queries and makes the app work the same
+                        # on every provider, pooled or direct.
+                        "prepare_threshold": None,
+                    },
+                    open=True)
     return _pool
 
 
