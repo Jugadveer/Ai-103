@@ -18,3 +18,4 @@ azure-ai-contentsafety==1.0.0         # responsible-AI guardrail
 # Testing
 pytest==8.3.4
 httpx==0.28.1
+sqlglot==30.18.0                      # parses our SQL as Postgres, offline
