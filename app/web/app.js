@@ -1101,14 +1101,49 @@ window.addEventListener('appinstalled', () => {
   toast('Installed. Launch it from your home screen or dock.');
 });
 
+// The service worker exists so an installed app opens without a network.
+// Two things it must not do.
+//
+// It must not run during development. A dev server plus a caching worker
+// means every edit is a coin toss over whether the browser shows it, and
+// the failure looks like the app being broken rather than stale: old
+// script against new markup, with no error anywhere.
+//
+// And when it does update, the page holding the old assets has to know.
+// A new worker calls skipWaiting and claims open pages, but those pages
+// keep running whatever they already loaded until something reloads them.
+// That is the state this app got into: new HTML, month-old script.
+const ON_LOCALHOST = ['localhost', '127.0.0.1', '[::1]']
+  .includes(location.hostname);
+
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => { /* offline shell is optional */ });
+  if (ON_LOCALHOST) {
+    // Clear anything a previous visit left behind, then stay out of the way.
+    navigator.serviceWorker.getRegistrations()
+      .then(all => all.forEach(r => r.unregister()))
+      .then(() => caches.keys())
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .catch(() => { /* nothing registered, nothing to undo */ });
+  } else {
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;      // fires again on the reload itself
+      reloading = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register('/sw.js')
+      .catch(() => { /* offline shell is optional */ });
+  }
 }
 
 async function warnIfSessionsAreUnstable() {
   // A signed-out-immediately loop is one of the least obvious things to
   // debug from the outside, so the screen where it happens says why.
   try {
+    // One process on your own machine has one key, so sessions are
+    // stable there whether or not SECRET_KEY is set. The warning is for
+    // hosts that run several.
+    if (ON_LOCALHOST) return;
     const h = await api.get('/api/health');
     if (h.sessions !== 'per_process') return;
     const note = document.createElement('div');
