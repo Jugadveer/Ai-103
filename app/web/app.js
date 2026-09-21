@@ -809,6 +809,17 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => { /* offline shell is optional */ });
 }
 
+function showEphemeralNotice() {
+  if (document.getElementById('ephemeral')) return;
+  const bar = document.createElement('div');
+  bar.id = 'ephemeral';
+  bar.className = 'notice';
+  bar.textContent = 'Preview deployment: this host does not keep data '
+    + 'between visits, so anything you log here may disappear. Run it '
+    + 'locally for real use.';
+  document.querySelector('.stage').prepend(bar);
+}
+
 /* ---------------- boot ---------------- */
 
 async function boot() {
@@ -820,6 +831,10 @@ async function boot() {
     $('svc').innerHTML = live.length
       ? 'azure <b>' + live.join(' ') + '</b>'
       : 'offline mode';
+
+    // Say so when the host cannot keep data. Silently losing what someone
+    // logged is worse than telling them it is a preview.
+    if (h.storage === 'ephemeral') showEphemeralNotice();
   } catch (e) { $('svc').textContent = 'server unreachable'; }
 
   // An installed shortcut can open straight into voice: /?voice=1

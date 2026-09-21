@@ -1,0 +1,42 @@
+# Render deployment.
+#
+# Preferred over a serverless host for this app. It is a stateful FastAPI
+# service backed by SQLite, so it needs a filesystem that survives between
+# requests. Render runs it as an ordinary container with a mounted disk,
+# which means data a tester logs is still there when they come back.
+services:
+  - type: web
+    name: health-coach
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    disk:
+      name: health-coach-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /data/health_coach.db
+      - key: MOCK_MODE
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      # Set these in the Render dashboard, never in this file.
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT
+        sync: false
+      - key: AZURE_OPENAI_API_VERSION
+        sync: false
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        sync: false
+      - key: AZURE_CONTENT_SAFETY_ENDPOINT
+        sync: false
+      - key: AZURE_CONTENT_SAFETY_KEY
+        sync: false

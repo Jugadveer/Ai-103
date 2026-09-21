@@ -113,6 +113,9 @@ def health():
         "status": "ok",
         "mock_mode": config.MOCK_MODE,
         "agents": list(bus.agents),
+        # Honest about the host. On a serverless platform the container is
+        # discarded between requests, so anything saved may not survive.
+        "storage": "persistent" if config.STORAGE_PERSISTENT else "ephemeral",
         "azure": {
             "openai": bool(config.AZURE_OPENAI_API_KEY),
             "search": bool(config.AZURE_SEARCH_API_KEY),

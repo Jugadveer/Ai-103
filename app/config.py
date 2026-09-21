@@ -32,8 +32,33 @@ AZURE_SPEECH_VOICE = _get("AZURE_SPEECH_VOICE", "en-IN-NeerjaNeural")
 AZURE_CONTENT_SAFETY_ENDPOINT = _get("AZURE_CONTENT_SAFETY_ENDPOINT")
 AZURE_CONTENT_SAFETY_KEY = _get("AZURE_CONTENT_SAFETY_KEY")
 
-# Storage
-DB_PATH = _get("DB_PATH", "health_coach.db")
+# --- storage -------------------------------------------------------------
+# Serverless hosts give a read-only filesystem with one writable temp
+# directory, and the container is thrown away between requests. So the
+# path is resolved at startup rather than assumed, and the app reports
+# honestly whether anything it saves will still be there later.
+
+def _resolve_storage(preferred: str) -> tuple[str, bool]:
+    """Return (path, persistent). Falls back to temp on a read-only disk."""
+    import os
+    import tempfile
+
+    candidate = os.path.abspath(preferred)
+    folder = os.path.dirname(candidate) or "."
+    try:
+        os.makedirs(folder, exist_ok=True)
+        probe = os.path.join(folder, ".write-probe")
+        with open(probe, "w") as handle:
+            handle.write("ok")
+        os.remove(probe)
+        return candidate, True
+    except OSError:
+        fallback = os.path.join(tempfile.gettempdir(), "health_coach.db")
+        return fallback, False
+
+
+DB_PATH, STORAGE_PERSISTENT = _resolve_storage(
+    _get("DB_PATH", "health_coach.db"))
 
 # Shown in the UI and spoken in the first reply. Not medical advice.
 DISCLAIMER = (

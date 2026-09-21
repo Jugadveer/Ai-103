@@ -98,3 +98,45 @@ def test_speak_endpoint_degrades_cleanly_without_speech(client):
 def test_speak_validates_input(client):
     assert client.post("/api/speak", json={"text": ""}).status_code == 422
     assert client.post("/api/speak", json={"text": "x" * 4000}).status_code == 422
+
+
+# --- deployment readiness --------------------------------------------
+
+def test_health_reports_whether_storage_survives(client):
+    """
+    A serverless host discards the container between requests. The app
+    has to know, so the interface can say so instead of silently losing
+    what someone logged.
+    """
+    storage = client.get("/api/health").json()["storage"]
+    assert storage in ("persistent", "ephemeral")
+
+
+def test_storage_falls_back_when_the_disk_is_read_only():
+    """Regression target: on Vercel every write returned a 500."""
+    import builtins
+    import tempfile
+    from app import config
+
+    real_open = builtins.open
+
+    def deny(path, *args, **kwargs):
+        if ".write-probe" in str(path):
+            raise OSError(30, "Read-only file system")
+        return real_open(path, *args, **kwargs)
+
+    builtins.open = deny
+    try:
+        path, persistent = config._resolve_storage("health_coach.db")
+    finally:
+        builtins.open = real_open
+
+    assert persistent is False
+    assert tempfile.gettempdir().lower() in path.lower()
+
+
+def test_storage_is_persistent_on_a_normal_disk():
+    from app import config
+    path, persistent = config._resolve_storage("health_coach.db")
+    assert persistent is True
+    assert path.endswith("health_coach.db")

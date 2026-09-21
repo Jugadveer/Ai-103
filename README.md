@@ -178,6 +178,13 @@ uvicorn app.main:app --reload
 Then open <http://127.0.0.1:8000>. Click **Load demo data** to populate a
 week of realistic logs, then ask about a headache.
 
+### Deploying it
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). In short: the app keeps state
+in SQLite, so a serverless host cannot hold its data. `render.yaml` is
+committed for a deployment with a real disk; `vercel.json` makes a Vercel
+preview work but the app will warn that nothing is saved.
+
 To load the demo dataset from the terminal instead:
 
 ```bash
