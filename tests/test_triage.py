@@ -286,3 +286,72 @@ def test_a_handoff_to_a_missing_agent_is_recorded_not_crashed(seeded_bus):
     seeded_bus.reset_trace()
     seeded_bus.handoff("coach", "nonexistent", reason="typo")
     assert len(seeded_bus.trace) == 1
+
+
+# --- off topic, decided once rather than per agent ------------------------
+
+@pytest.mark.parametrize("message", [
+    "what is the capital of France",
+    "write me a python function to sort a list",
+    "who won the cricket match",
+    "tell me a joke",
+])
+def test_off_topic_is_declined_before_anything_is_routed(model, message):
+    """
+    "Write me a python function" was routed to the nutrition agent,
+    which found no food in it and replied "Nothing logged. Tell me what
+    you ate whenever you like." Deciding a message is not ours belongs to
+    the layer that sees every message, not to whichever agent the router
+    happened to pick.
+    """
+    model("OFF_TOPIC")
+    result = safety.check(message, deep=True)
+    assert result["safe"] is False
+    assert result["reason"] == "off_topic"
+    assert "outside what I do" in result["message"]
+
+
+def test_off_topic_is_in_the_triage_prompt():
+    assert "OFF_TOPIC" in safety.TRIAGE_PROMPT
+    assert "Coding, homework, geography" in safety.TRIAGE_PROMPT
+
+
+# --- the right refusal for the right reason -------------------------------
+
+def test_a_dose_question_flagged_by_content_safety_is_not_a_crisis(monkeypatch):
+    """
+    Azure classifies "how many mg of paracetamol should I take" as
+    self-harm, which is defensible of it. The app used to answer every
+    Content Safety hit with "if you're struggling, please talk to someone
+    you trust", so a dosage question got a mental-health response.
+    """
+    from app.services import llm
+    monkeypatch.setattr(llm, "available", lambda: False)   # no triage
+    monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: "Violence")
+    result = safety.check("something odd", deep=True)
+    assert result["message"] == safety.HARMFUL_MESSAGE
+    assert "struggling" not in result["message"]
+    assert "pharmacist" in result["message"] or "doctor" in result["message"]
+
+
+def test_content_safety_self_harm_does_get_the_crisis_message(monkeypatch):
+    from app.services import llm
+    monkeypatch.setattr(llm, "available", lambda: False)
+    monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: "SelfHarm")
+    result = safety.check("something bleak", deep=True)
+    assert result["message"] == safety.CRISIS_MESSAGE
+    assert "14416" in result["message"]
+
+
+def test_the_category_is_recorded_for_the_trace(monkeypatch):
+    from app.services import llm
+    monkeypatch.setattr(llm, "available", lambda: False)
+    monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: "Hate")
+    assert safety.check("x", deep=True)["matched"] == "azure:Hate"
+
+
+def test_content_safety_returning_nothing_lets_the_message_through(monkeypatch):
+    from app.services import llm
+    monkeypatch.setattr(llm, "available", lambda: False)
+    monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: "")
+    assert safety.check("I feel tired today", deep=True)["safe"] is True

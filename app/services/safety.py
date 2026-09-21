@@ -80,8 +80,8 @@ SCOPE_MESSAGE = (
 )
 
 HARMFUL_MESSAGE = (
-    "I'm not able to help with that. If you're struggling, please talk to "
-    "someone you trust or a qualified professional."
+    "I'm not able to help with that one. If it is about medication or a "
+    "dose, a pharmacist or doctor is the right person to ask."
 )
 
 # A dosage question used to land on the message above, which talks about
@@ -93,6 +93,17 @@ MEDICATION_MESSAGE = (
     "anything. A pharmacist or doctor can, and a pharmacist is usually "
     "quick to reach. I can keep track of whether you have taken something, "
     "and nothing more than that."
+)
+
+# Caught here rather than in whichever agent the router happened to pick.
+# "Write me a python function" reached the nutrition agent, which had no
+# food to find and replied "Nothing logged, tell me what you ate."
+# Deciding a message is not ours is a job for the layer that sees every
+# message, not for the one that was guessed at.
+OFF_TOPIC_MESSAGE = (
+    "That one is outside what I do. I can help with sleep, food, water, "
+    "movement, mood and how you have been feeling, and I can show you "
+    "patterns in what you have logged."
 )
 
 CRISIS_MESSAGE = (
@@ -157,6 +168,7 @@ TRIAGE = {
     "CRISIS": ("self_harm", CRISIS_MESSAGE),
     "DIAGNOSIS": ("out_of_scope", SCOPE_MESSAGE),
     "MEDICATION": ("medication", MEDICATION_MESSAGE),
+    "OFF_TOPIC": ("off_topic", OFF_TOPIC_MESSAGE),
 }
 
 
@@ -248,9 +260,16 @@ def check(text: str, deep: bool = False) -> dict:
             log.warn("triage_block", matched=verdict["matched"])
             return verdict
 
-    if deep and content_safety_flags(text):
-        return {"safe": False, "reason": "content_safety", "matched": "azure",
-                "message": HARMFUL_MESSAGE}
+    if deep:
+        category = content_safety_flags(text)
+        if category:
+            # Self-harm gets the crisis message and a helpline. Anything
+            # else gets a plain refusal, because telling someone who asked
+            # about a dose that help is available reads as a non sequitur.
+            crisis = "selfharm" in category.lower()
+            return {"safe": False, "reason": "content_safety",
+                    "matched": f"azure:{category}",
+                    "message": CRISIS_MESSAGE if crisis else HARMFUL_MESSAGE}
 
     return {"safe": True, "reason": "", "matched": "", "message": ""}
 
@@ -260,9 +279,18 @@ def content_safety_available() -> bool:
         config.AZURE_CONTENT_SAFETY_KEY and config.AZURE_CONTENT_SAFETY_ENDPOINT)
 
 
-def content_safety_flags(text: str, threshold: int = 4) -> bool:
+def content_safety_flags(text: str, threshold: int = 4) -> str:
     """
-    Azure AI Content Safety check. Returns True if the text is harmful.
+    Azure AI Content Safety check. Returns the worst category it flagged,
+    or "" for nothing. Truthy either way, so `if content_safety_flags(x)`
+    reads the same as it always did.
+
+    It returns the category rather than a bare yes, because the category
+    decides what the user is told. "How many mg of paracetamol should I
+    take" trips the self-harm classifier, which is reasonable of it, and
+    the single message this used to return said "if you are struggling,
+    please talk to someone you trust". Answering a dosage question that
+    way is its own kind of wrong.
 
     Fails CLOSED-ish by design: if the service is unreachable we return
     False (not harmful) because layers 1 and 2 have already run and a
@@ -286,11 +314,13 @@ def content_safety_flags(text: str, threshold: int = 4) -> bool:
             lambda: client.analyze_text(AnalyzeTextOptions(text=text)),
             label="content_safety",
         )
-        worst = max((c.severity for c in result.categories_analysis), default=0)
-        if worst >= threshold:
-            log.warn("content_safety_flagged", severity=worst)
-            return True
-        return False
+        worst = max(result.categories_analysis,
+                    key=lambda c: c.severity, default=None)
+        if worst is not None and worst.severity >= threshold:
+            log.warn("content_safety_flagged", severity=worst.severity,
+                     category=str(worst.category))
+            return str(worst.category)
+        return ""
     except Exception as exc:
         log.warn("content_safety_unavailable", error=str(exc)[:120])
-        return False
+        return ""
