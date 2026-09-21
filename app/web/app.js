@@ -1110,9 +1110,11 @@ function showEphemeralNotice() {
   const bar = document.createElement('div');
   bar.id = 'ephemeral';
   bar.className = 'notice';
-  bar.textContent = 'Preview deployment: this host does not keep data '
-    + 'between visits, so anything you log here may disappear. Run it '
-    + 'locally for real use.';
+  // Worth being specific now that there are accounts: it is not only
+  // today's logging that goes, it is the account itself.
+  bar.textContent = 'This host has no database attached, so accounts and '
+    + 'anything you log here can disappear at any time. Set DATABASE_URL '
+    + 'to keep them.';
   document.querySelector('.stage').prepend(bar);
 }
 

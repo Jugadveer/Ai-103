@@ -2,9 +2,9 @@
 Loads a realistic month of demo data.
 
 Used by `python -m scripts.seed`, by POST /api/seed, by the tests that
-need a populated database, and automatically on a fresh deployment when
-SEED_ON_EMPTY is set. Keeping it in one place means the demo, the tests,
-the video and the hosted preview all show the same numbers.
+need a populated database, and by a new account that ticks "start with
+sample data" on the way in. Keeping it in one place means the demo, the
+tests, the video and the hosted app all show the same numbers.
 
 The dataset is deliberately shaped rather than random:
 
