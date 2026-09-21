@@ -100,10 +100,6 @@ body {
   color: var(--accent); border-left-color: var(--accent);
   background: var(--accent-wash); font-weight: 500;
 }
-.nav-links a .glyph {
-  font-family: var(--mono); font-size: 11px; width: 16px; text-align: center;
-  opacity: .8;
-}
 .nav-links .divider {
   margin: 10px 20px; border-top: 1px solid var(--rule);
 }
@@ -116,8 +112,9 @@ body {
   border-top: 1px solid var(--rule); padding: 12px 20px;
   display: flex; flex-direction: column; gap: 8px;
 }
-.nav-foot .svc { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); }
-.nav-foot .svc b { color: var(--accent); font-weight: 600; }
+.nav-foot .svc { font-family: var(--sans); font-size: 11.5px; color: var(--ink-faint); }
+.nav-foot .svc b { color: var(--accent); font-weight: 400; }
+.nav-foot .svc .dim { color: var(--ink-faint); }
 .nav-foot .row { display: flex; gap: 6px; }
 
 /* ---------- page shell ---------- */
@@ -687,17 +684,19 @@ button:disabled { opacity: .45; cursor: default; }
   color: var(--ink-faint); font-weight: 600;
 }
 .rcard-value {
-  font-family: var(--mono); font-variant-numeric: tabular-nums;
-  font-size: 22px; font-weight: 600; margin-top: 3px; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  font-size: 27px; font-weight: 600; margin-top: 4px; letter-spacing: -0.035em;
+  line-height: 1.1;
 }
 .rcard-note { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px;
               line-height: 1.4; min-height: 2.6em; }
-.rcard-axis { font-size: 9px; color: var(--ink-faint); margin-top: 3px;
-              font-family: var(--mono); }
+.rcard-axis { font-size: 9.5px; color: var(--ink-faint); margin-top: 4px; }
 .sparkline { display: block; width: 100%; height: 26px; margin-top: 6px; }
 .sparkline .spark { fill: var(--accent); opacity: .85; }
-.sparkline .spark.is-low { fill: var(--ink-faint); opacity: .45; }
-.sparkline .spark-gap { fill: var(--rule); }
+.sparkline .spark.is-low { fill: var(--accent); opacity: .32; }
+.sparkline .spark-gap { fill: var(--ink-faint); opacity: .3; }
+.sparkline .spark-target { stroke: var(--ink-faint); stroke-width: 1;
+                           stroke-dasharray: 2 3; opacity: .5; }
 
 .report-section { padding: 16px 20px; border-bottom: 1px solid var(--rule-soft); }
 .report-section h4 {
@@ -709,7 +708,8 @@ button:disabled { opacity: .45; cursor: default; }
 .rmeta { display: flex; flex-wrap: wrap; gap: 10px 30px; }
 .rmeta div { display: flex; flex-direction: column; gap: 1px; }
 .rmeta span { font-size: 11.5px; color: var(--ink-faint); }
-.rmeta b { font-family: var(--mono); font-size: 15px; font-weight: 600; }
+.rmeta b { font-size: 16px; font-weight: 600;
+           font-variant-numeric: tabular-nums; }
 
 .symptom-list { list-style: none; margin: 0; padding: 0; }
 .symptom-list li {
@@ -718,7 +718,7 @@ button:disabled { opacity: .45; cursor: default; }
 }
 .symptom-list li:last-child { border-bottom: 0; }
 .symptom-list .when {
-  font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint);
+  font-size: 11.5px; color: var(--ink-faint); font-weight: 600;
   min-width: 52px; padding-top: 1px;
 }
 
@@ -748,7 +748,3 @@ button:disabled { opacity: .45; cursor: default; }
 
 /* Status reads as a state, not a list of service names. The detail is
    still there on hover for anyone who wants it. */
-.nav-foot .svc { font-family: var(--sans); font-size: 11.5px; }
-.nav-foot .svc b { color: var(--accent); font-weight: 400; }
-.nav-foot .svc .dim { color: var(--ink-faint); }
-.nav-links a .glyph { display: none; }

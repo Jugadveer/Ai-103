@@ -533,8 +533,13 @@ function sparkline(points, target, width, height) {
             x="${x.toFixed(1)}" y="${(height - h).toFixed(1)}"
             width="${w.toFixed(1)}" height="${h.toFixed(1)}"/>`;
   }).join('');
+  // A dashed rule at the target, so the bars are read against something
+  // rather than just being tall or short.
+  const ty = (height - (target / peak) * height).toFixed(1);
+  const line = `<line class="spark-target" x1="0" y1="${ty}"
+                x2="${width}" y2="${ty}"/>`;
   return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"
-          class="sparkline" aria-hidden="true">${bars}</svg>`;
+          class="sparkline" aria-hidden="true">${line}${bars}</svg>`;
 }
 
 const REPORT_CARDS = [
