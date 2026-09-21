@@ -17,6 +17,9 @@ python -m scripts.check_azure     # confirm three services are live
 uvicorn app.main:app --reload
 ```
 
+`python -m scripts.seed` makes a `demo@local` account with the password
+`demo1234` and a month of history in it. Sign in as that.
+
 Then, once, in the app:
 
 1. **My body** page: enter height 175, weight 70, age 21, sex, activity
@@ -27,7 +30,9 @@ Then, once, in the app:
    ready rather than loading on camera.
 4. Allow the microphone when the browser asks, and say one test sentence.
 5. Leave the app on **Today**, light theme, browser zoom 110%.
-6. Close every other tab. The tab bar is in the recording.
+6. Sign out and back in once, so the browser has offered to save the
+   password and will not interrupt the recording with a prompt.
+7. Close every other tab. The tab bar is in the recording.
 
 **Who speaks.** Two voices, not five. One narrates sections 1, 2, 3 and 5;
 the other drives the screen and talks through the demo. Four people reading
@@ -43,8 +48,14 @@ on presentation day, which is a separate thing.
 > It is a wellness assistant built as thirteen AI agents that talk to each
 > other. Not one chatbot with a health theme. Thirteen specialists, each
 > owning one part of your health, that compare notes before they answer.
+>
+> Everyone has their own account, and one account cannot see another's
+> record. We did not want to trust ourselves to remember that in every
+> query, so a test reads every line of SQL in the project and fails the
+> build if one asks for health data without saying whose.
 
-*On screen: Today page, rings visible. Do not click yet.*
+*On screen: the sign-in screen. Sign in while the first line is spoken,
+so the demo starts from a real session rather than an app already open.*
 
 ---
 
