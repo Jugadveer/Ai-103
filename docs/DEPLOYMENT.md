@@ -94,18 +94,41 @@ curl https://<your-host>/api/health
 ```json
 {
   "status": "ok",
+  "database": "ok",
   "storage": "persistent",
   "backend": "postgres",
   "accounts": 3,
+  "sessions": "stable",
   "agents": ["coach", "..."],
   "azure": { "openai": true, "speech": true, "content_safety": true }
 }
 ```
 
+That is what a correct deployment looks like. Anything else:
+
+- `database` anything but `ok` means the app cannot reach Postgres. The
+  value names the error. This endpoint deliberately answers rather than
+  failing, because Render treats a failing health check as a failed
+  deploy and then all you know is that it did not work
 - `storage: ephemeral` means accounts and logs will not survive
 - `backend: sqlite` on a hosted deployment means `DATABASE_URL` is missing
+- `sessions: per_process` means `SECRET_KEY` is missing, and people will
+  be signed out at random
 - any `azure` flag `false` means that variable is missing on the host
 - the app still runs with all of them false, on local rules and data
+
+## What the free plan actually gives you
+
+- A free Postgres **expires 30 days after it is created**, with a further
+  14 days before deletion. Only **one** can be active per workspace
+- A free web service sleeps after 15 minutes without traffic and takes
+  about a minute to wake. The data is unaffected: it is in the database,
+  not the container
+- 750 free instance hours per workspace per month, which one always-on
+  service does not quite use up
+
+None of that affects a demo. It does mean this is not somewhere to keep
+anything you care about past October.
 
 ## Moving from a pre-accounts database
 
