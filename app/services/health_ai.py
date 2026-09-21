@@ -48,19 +48,28 @@ important to note that"."""
 # A last line of defence. If an answer names a condition or reaches for
 # medication despite the prompt, it is discarded rather than shown.
 FORBIDDEN = re.compile(
-    # Claiming a condition, or reaching for treatment.
+    # Naming a condition, or giving dosing advice.
     #
-    # Deliberately narrow. An earlier version also caught "supplement",
-    # "deficiency" and "infection", which silently blocked a perfectly
-    # good answer about protein intake. Over-blocking is not safety, it
-    # is a broken feature: the answer just vanished.
-    r"you (?:probably |likely |may |might )?have\b"
+    # This list is deliberately about CONDITIONS and DOSES, not about
+    # the phrase "you have". An earlier version blocked any "you
+    # have", which is ordinary English: "share any symptoms you have"
+    # and "if you have trouble sleeping" were both discarded, so the
+    # answer silently vanished and the user got statistics instead.
+    # Over-blocking is not safety. It is an invisible outage.
+    #
+    # This is the third layer, not the only one: the safety gate
+    # refuses diagnosis requests before any of this runs, and the
+    # system prompt forbids it as well.
+    r"diagnos\w+"
     r"|sounds like (?:you have|a case of)"
-    r"|diagnos\w+"
-    r"|\b(?:anaemia|anemia|diabetes|hypertension|thyroid|reflux)\b"
-    r"|\d+\s*mg\b|milligram|dosage|\bdoses?\b"
+    r"|\b(?:anaemia|anemia|diabetes|hypertension|thyroid|reflux|gerd"
+    r"|ulcer|gastritis|migraine|asthma|arthritis|appendicitis"
+    r"|concussion|pneumonia|tumou?r|cancer)\b"
+    r"|\d+\s*mg\b|milligram|dosage"
+    r"|(?:your|the|a|this)(?:\s+\w+)? doses?\b"
+    r"|(?:change|adjust|double|halve|increase|reduce) (?:the |your )?dose"
     r"|prescri\w+|antibiotic|paracetamol|ibuprofen|antacid"
-    r"|(?:take|start|stop|increase|reduce) (?:a |an |your )?"
+    r"|(?:start|stop|increase|reduce) (?:taking )?(?:a |an |your )?"
     r"(?:tablet|pill|medicine|medication)",
     re.IGNORECASE)
 

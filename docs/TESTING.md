@@ -4,7 +4,7 @@
 python -m pytest tests/ -q
 ```
 
-**253 tests, all passing, in about 5 seconds.** No Azure credentials needed —
+**294 tests, all passing, in about 5 seconds.** No Azure credentials needed —
 the suite runs entirely in `MOCK_MODE` against a throwaway SQLite file.
 
 Testing, reliability and responsible AI carry 15% of the project grade, and

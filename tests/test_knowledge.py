@@ -138,3 +138,41 @@ def test_the_local_knowledge_base_is_only_a_fallback(bus, clean_db):
     reply = bus.get("coach").handle("I keep getting acidity after meals")
     assert reply.text                                # still answers
     assert "not a diagnosis" in reply.text
+
+
+# --- the guardrail must not eat ordinary English ---------------------
+
+@pytest.mark.parametrize("text", [
+    "Share any symptoms you have, and how long they have lasted.",
+    "If you have trouble sleeping, keep the room dark and cool.",
+    "Taking it at the same time keeps a steady level between doses.",
+    "Aim for at least 150 minutes of moderate activity each week.",
+    "A good sleep routine means going to bed at the same time daily.",
+])
+def test_ordinary_phrasing_is_not_blocked(text):
+    """
+    Regression, and the worst kind: an over-broad rule silently discarded
+    four perfectly good answers, and the user just saw statistics. The
+    phrase "you have" is ordinary English, not a diagnosis. What makes a
+    diagnosis is naming a condition.
+    """
+    assert not health_ai.FORBIDDEN.search(text), f"wrongly blocked: {text!r}"
+
+
+@pytest.mark.parametrize("text", [
+    "You probably have acid reflux.",
+    "That is a classic sign of diabetes.",
+    "You may have a thyroid problem.",
+    "The recommended dose is two tablets.",
+    "You should stop taking your medication.",
+])
+def test_conditions_and_dosing_are_still_caught(text):
+    assert health_ai.FORBIDDEN.search(text), f"got through: {text!r}"
+
+
+def test_every_agent_can_answer_a_question(bus):
+    """All thirteen, including the meta-agents that hold no data."""
+    for name in bus.agents:
+        if name == "coach":
+            continue
+        assert hasattr(bus.get(name), "try_answer"), name

@@ -190,7 +190,7 @@ python -m scripts.seed
 python -m pytest tests/ -q
 ```
 
-**253 tests, all passing.** Full breakdown in [docs/TESTING.md](docs/TESTING.md).
+**294 tests, all passing.** Full breakdown in [docs/TESTING.md](docs/TESTING.md).
 
 | Suite | Tests | Covers |
 |---|---|---|

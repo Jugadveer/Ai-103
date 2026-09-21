@@ -76,6 +76,14 @@ class ProgressAgent(BaseAgent):
     )
 
     def handle(self, query: str) -> AgentReply:
+        # A question about the subject deserves an answer, not this
+        # agent's analysis. "Why do streaks help with habits" is not a
+        # request for the current streak.
+        spoken = self.try_answer(query)
+        if spoken:
+            return AgentReply(agent=self.name, text=spoken,
+                              data={"answered": True})
+
         f = self.report()
         if f["days_logged"] == 0:
             return AgentReply(

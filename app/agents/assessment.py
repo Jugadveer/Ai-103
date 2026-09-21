@@ -49,6 +49,14 @@ class AssessmentAgent(BaseAgent):
     # ---------------- entry ----------------
 
     def handle(self, query: str) -> AgentReply:
+        # A question about the subject deserves an answer, not this
+        # agent's analysis. "Why do streaks help with habits" is not a
+        # request for the current streak.
+        spoken = self.try_answer(query)
+        if spoken:
+            return AgentReply(agent=self.name, text=spoken,
+                              data={"answered": True})
+
         missing = self._missing_profile()
         if missing:
             return self._ask_for(missing[0])
