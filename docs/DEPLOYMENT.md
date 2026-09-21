@@ -14,10 +14,17 @@ Vercel runs serverless functions. Two consequences:
    data disappears unpredictably, and two people using it at the same time
    may be served by different containers holding different data.
 
-`vercel.json` points `DB_PATH` at `/tmp` so it stops erroring, and the app
-detects the read-only disk at startup and falls back on its own. The
-interface then shows a banner saying data will not be kept, because
-silently losing what someone logged is worse than telling them.
+There is deliberately **no `vercel.json`**. One was added and it broke the
+whole deployment with a 500: the `builds`/`routes` format is the legacy
+config and it overrides Vercel's own detection, which was working.
+Vercel's current Python support expects the ASGI app under `api/`, which
+would mean restructuring the project for a preview that cannot hold data
+anyway. Not worth it.
+
+Instead the app detects the read-only disk at startup and falls back to
+`/tmp` by itself, so no host configuration is needed. The interface then
+shows a banner saying data will not be kept, because silently losing what
+someone logged is worse than telling them.
 
 **Use Vercel to show the app exists. Do not use it to test with.**
 
