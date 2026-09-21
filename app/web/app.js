@@ -147,7 +147,7 @@ async function refreshTodayInsights() {
   $('today-insights').innerHTML = patterns.length
     ? patterns.map(p => `<p style="margin:0 0 9px;font-size:13.5px">
         ${escapeHtml(p.insight)}.
-        <span class="mono" style="font-size:11px;color:var(--ink-faint)">
+        <span class="num" style="font-size:11.5px;color:var(--ink-faint)">
           ${escapeHtml(p.evidence)}</span></p>`).join('')
     : '<p class="placeholder">Nothing stands out yet. A few more days of ' +
       'logging makes patterns easier to spot.</p>';
