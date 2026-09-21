@@ -13,24 +13,33 @@ from app.services import safety
 
 
 class FakeModel:
-    def __init__(self, verdict):
+    """Stands in for Azure. `reason` mimics what came back with the text:
+    "ok", or "content_filter" when Azure refused to process the prompt."""
+
+    def __init__(self, verdict, reason="ok"):
         self.verdict = verdict
+        self.reason = reason
         self.asked = []
 
     def chat(self, system, user, **kwargs):
         self.asked.append(user)
         return self.verdict
 
+    def chat_with_reason(self, system, user, **kwargs):
+        self.asked.append(user)
+        return self.verdict, self.reason
+
 
 @pytest.fixture
 def model(monkeypatch):
     """Point the triage layer at a model we control."""
-    def install(verdict):
+    def install(verdict, reason="ok"):
         from app.services import llm
-        fake = FakeModel(verdict)
+        fake = FakeModel(verdict, reason)
         monkeypatch.setattr(llm, "available", lambda: True)
         monkeypatch.setattr(llm, "chat", fake.chat)
-        monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: False)
+        monkeypatch.setattr(llm, "chat_with_reason", fake.chat_with_reason)
+        monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: "")
         return fake
     return install
 
@@ -356,3 +365,41 @@ def test_content_safety_returning_nothing_lets_the_message_through(monkeypatch):
     monkeypatch.setattr(llm, "available", lambda: False)
     monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: "")
     assert safety.check("I feel tired today", deep=True)["safe"] is True
+
+
+# --- when Azure refuses to even look at it --------------------------------
+
+def test_a_prompt_azure_will_not_process_is_treated_as_sensitive(model):
+    """
+    Azure OpenAI runs its own content filter, and "how many mg of
+    paracetamol should I take" trips it: the call raises instead of
+    returning a classification. That empty result used to be
+    indistinguishable from the network being down, so the message fell
+    through to Content Safety, was scored as self-harm, and answered
+    with a crisis helpline. Azure declining to process something is
+    information, not an outage.
+    """
+    model("", reason="content_filter")
+    result = safety.check("how many mg of paracetamol should I take", deep=True)
+    assert result["safe"] is False
+    assert result["reason"] == "content_filter"
+    assert result["matched"] == "azure:prompt_filter"
+    assert "pharmacist" in result["message"]
+    assert "struggling" not in result["message"]
+    assert "14416" not in result["message"]      # not a crisis, a dose question
+
+
+def test_a_real_outage_does_not_block_everything(model):
+    """
+    The difference that makes the above safe. If every empty result were
+    treated as sensitive, one Azure hiccup would refuse every free-text
+    message in the app.
+    """
+    model("", reason="error")
+    assert safety.triage("I have a mild sore throat") is None
+    assert safety.check("I have a mild sore throat", deep=True)["safe"] is True
+
+
+def test_an_unconfigured_model_does_not_block_everything(model):
+    model("", reason="not_configured")
+    assert safety.triage("I feel tired") is None

@@ -187,10 +187,23 @@ def triage(text: str) -> dict | None:
     if not llm.available():
         return None
     try:
-        verdict = (llm.chat(TRIAGE_PROMPT, text) or "").strip().upper()
+        reply, reason = llm.chat_with_reason(TRIAGE_PROMPT, text)
     except Exception as exc:
         log.warn("triage_unavailable", error=type(exc).__name__)
         return None
+
+    if reason == "content_filter":
+        # Azure would not even classify it. That is a verdict of its own,
+        # and the safe reading is that the message was sensitive rather
+        # than that the service was down. Neutral wording, because we do
+        # not know which way it was sensitive.
+        log.warn("triage_filtered")
+        return {"safe": False, "reason": "content_filter",
+                "matched": "azure:prompt_filter", "message": HARMFUL_MESSAGE}
+    if reason != "ok":
+        return None
+
+    verdict = (reply or "").strip().upper()
 
     for name, (reason, message) in TRIAGE.items():
         if verdict.startswith(name):

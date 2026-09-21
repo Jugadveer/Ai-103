@@ -28,10 +28,24 @@ def available() -> bool:
     )
 
 
-def chat(system: str, user: str, temperature: float = 0.3) -> str:
-    """Single-turn completion. Falls back to the raw prompt in mock mode."""
+def chat_with_reason(system: str, user: str,
+                     temperature: float = 0.3) -> tuple[str, str]:
+    """
+    Single-turn completion, and why it is empty when it is.
+
+    Reasons: ok, not_configured, content_filter, error.
+
+    The distinction matters to the safety layer. Azure OpenAI runs its
+    own content filter, and a prompt it refuses raises rather than
+    returning text. Swallowing that into "" made it look exactly like the
+    network being down, so asking "how many mg of paracetamol should I
+    take" produced an empty triage result, fell through to Content
+    Safety, was classified as self-harm and answered with a crisis
+    helpline. Azure declining to process a message is information: it
+    means the message was sensitive, not that the service was missing.
+    """
     if not available():
-        return ""
+        return "", "not_configured"
 
     def _call():
         return _get_client().chat.completions.create(
@@ -46,10 +60,21 @@ def chat(system: str, user: str, temperature: float = 0.3) -> str:
 
     try:
         resp = with_retry(_call, label="azure_openai")
-        return (resp.choices[0].message.content or "").strip()
+        return (resp.choices[0].message.content or "").strip(), "ok"
     except Exception as exc:
-        log.error("llm_failed", error=str(exc)[:160])
-        return ""
+        detail = str(exc)
+        filtered = ("content_filter" in detail
+                    or "content management policy" in detail.lower()
+                    or getattr(getattr(exc, "body", None), "get", lambda k: None)("code")
+                    == "content_filter")
+        log.error("llm_failed", error=detail[:160],
+                  filtered=bool(filtered))
+        return "", ("content_filter" if filtered else "error")
+
+
+def chat(system: str, user: str, temperature: float = 0.3) -> str:
+    """Single-turn completion. Empty when it could not answer."""
+    return chat_with_reason(system, user, temperature)[0]
 
 
 VISION_PROMPT = (
