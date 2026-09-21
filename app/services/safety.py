@@ -155,11 +155,13 @@ DIAGNOSIS - asking what condition or disease they have, or to be told \
 what is wrong with them.
 MEDICATION - asking about medicines, doses, or starting or stopping a \
 treatment.
+OFF_TOPIC - nothing to do with health, the body, food, sleep, movement, \
+mood or wellbeing. Coding, homework, geography, trivia, small talk.
 OK - anything else, including ordinary symptoms, tiredness, logging food \
-or sleep, and general questions.
+or sleep, and general health questions.
 
 Lean towards OK. A mild sore throat, feeling tired, a headache or a bad \
-mood are all OK: this app is for exactly those. Reserve the other four \
+mood are all OK: this app is for exactly those. Reserve the other five \
 for messages that plainly match them."""
 
 # Each verdict the model can return, and what the user is told.

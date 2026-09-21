@@ -314,6 +314,7 @@ def test_off_topic_is_declined_before_anything_is_routed(model, message):
 def test_off_topic_is_in_the_triage_prompt():
     assert "OFF_TOPIC" in safety.TRIAGE_PROMPT
     assert "Coding, homework, geography" in safety.TRIAGE_PROMPT
+    assert "other five" in safety.TRIAGE_PROMPT  # not four any more
 
 
 # --- the right refusal for the right reason -------------------------------
