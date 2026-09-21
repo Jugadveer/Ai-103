@@ -28,6 +28,30 @@ So the app now speaks Postgres as well. Set `DATABASE_URL` and the same
 SQL runs against it; leave it empty and it is SQLite on disk, which is
 what you want locally. `/api/health` reports which one it got.
 
+## Which host
+
+Both work. The old answer in this file was that Vercel could only ever be
+a preview, and that was true when the app was a SQLite file: a serverless
+host has no disk to keep it on. Postgres removed that objection, so the
+choice is now an ordinary trade-off rather than a technical wall.
+
+| | Vercel | Render |
+|---|---|---|
+| Database | You attach one (Neon, Supabase, Azure) | Provisioned by `render.yaml` |
+| Idle behaviour | Warm instances, no wake-up wait | Free service sleeps after 15 min, wakes in ~1 min |
+| Free database lifetime | Neon's free tier does not expire | Render's free Postgres expires 30 days after creation |
+| Setup | Two environment variables | One click |
+
+**For sharing a link with the team, Vercel is the better one**, for one
+reason that outweighs the rest: nobody waits a minute for it. A free
+Render service asleep when a marker opens the link is a bad first
+impression of an otherwise working app.
+
+**Render is the better one if you want it done in a single step**, since
+it creates the database itself and there is nothing to copy.
+
+Either way the app is identical. `DATABASE_URL` is `DATABASE_URL`.
+
 ## Render, which sets this up for you
 
 `render.yaml` declares the web service **and** a Postgres database, and
@@ -55,8 +79,8 @@ still there: it is in the database, not the container.
 
 ## Vercel
 
-Vercel can run this properly too, but it will not provision a database
-for you, so that part is manual:
+Vercel runs this properly. It just will not provision a database for you,
+so that part is manual:
 
 1. Get a Postgres connection string. Vercel's own marketplace (Neon) has
    a free tier, and so does Supabase. Azure Database for PostgreSQL works
@@ -68,6 +92,15 @@ for you, so that part is manual:
 
 Without step 2 the deployment still works, but it is a demo: the banner
 warns that accounts can vanish, and they will.
+
+Two things about running on serverless that the code already handles, so
+they are here as explanation rather than instructions. Every warm
+instance keeps its own connection pool, which is why `max_size` is small:
+five per instance shared across a handful is fine, fifty each is not.
+And an instance is frozen between requests, so a pooled connection can be
+dead by the time it thaws. The pool checks a connection before handing it
+over, which turns "one request failed for no reason and worked on retry"
+into nothing happening at all.
 
 There is deliberately **no `vercel.json`**. One was added and it broke the
 whole deployment with a 500: the `builds`/`routes` format is the legacy

@@ -160,12 +160,22 @@ def _postgres_pool():
                 from psycopg.rows import dict_row
                 _pool = ConnectionPool(
                     config.DATABASE_URL, min_size=1, max_size=5,
-                    # Free Postgres allows few connections and the free
-                    # web service is one small instance, so five is
-                    # plenty. Wait ten seconds for one, not the default
-                    # thirty: a database that is actually down should
-                    # show up as an error while someone is still looking
-                    # at the screen.
+                    # Few connections on purpose. A free Postgres does not
+                    # allow many, and on a serverless host every warm
+                    # instance holds its own pool, so a large max_size
+                    # here multiplies rather than shares.
+                    #
+                    # check is the one that matters off a normal server. A
+                    # serverless instance is frozen between requests and
+                    # thawed later, by which time the other end may have
+                    # dropped a connection this pool still believes in.
+                    # Without this the symptom is a request that fails
+                    # once, for no reason, and works on retry.
+                    check=ConnectionPool.check_connection,
+                    max_idle=120,      # let idle ones go rather than rot
+                    # Ten seconds to get a connection, not the default
+                    # thirty: a database that is genuinely down should say
+                    # so while someone is still looking at the screen.
                     timeout=10,
                     kwargs={"row_factory": dict_row}, open=True)
     return _pool
