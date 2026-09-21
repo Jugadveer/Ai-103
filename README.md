@@ -11,7 +11,7 @@ September 2026.
 | Ashnoor | 2410992511 |
 | Kanan | 2410992532 |
 | Husan | 2410992561 |
-| Kishika | 24100992540 |
+| Kishika | 2410992540 |
 
 ## The problem
 
