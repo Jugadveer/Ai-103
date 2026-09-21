@@ -27,7 +27,74 @@
 </head>
 <body>
 
-<nav class="nav">
+<!-- ============ SIGN IN ============
+     Covers the app until we know who is here. Hidden rather than absent
+     so there is no flash of an empty dashboard while /api/auth/me is in
+     flight, and no second page to keep in step with this one. -->
+<div class="gate" id="gate" hidden>
+  <div class="gate-card">
+
+    <div class="gate-pitch">
+      <h1>Health Coach</h1>
+      <p class="gate-lede">Thirteen agents that compare notes before they
+         answer you.</p>
+      <ul class="gate-points">
+        <li>Log meals, sleep, water and movement by talking to it</li>
+        <li>Ask why you feel off and it checks every domain at once</li>
+        <li>Build a one page summary to take to an appointment</li>
+      </ul>
+      <p class="gate-small">A wellness tool, not a medical device. It never
+         diagnoses. Your data is yours alone and is not shared with anyone.</p>
+    </div>
+
+    <div class="gate-form">
+      <div class="gate-tabs" role="tablist">
+        <button type="button" id="tab-signin" class="is-on" role="tab">Sign in</button>
+        <button type="button" id="tab-signup" role="tab">Create account</button>
+      </div>
+
+      <form id="auth-form" autocomplete="on" novalidate>
+        <label class="field" id="field-name" hidden>
+          <span>Your name</span>
+          <input type="text" id="auth-name" autocomplete="name"
+                 placeholder="Ashnoor">
+        </label>
+
+        <label class="field">
+          <span>Email</span>
+          <input type="email" id="auth-email" autocomplete="email"
+                 placeholder="you@example.com" required>
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <input type="password" id="auth-password" required
+                 autocomplete="current-password"
+                 placeholder="At least 8 characters">
+        </label>
+
+        <label class="check" id="field-sample" hidden>
+          <input type="checkbox" id="auth-sample" checked>
+          <span>Start with a month of sample data, so the charts have
+                something in them</span>
+        </label>
+
+        <div class="gate-errors" id="auth-errors" hidden></div>
+
+        <button class="btn primary wide" id="auth-submit" type="submit">
+          Sign in</button>
+      </form>
+
+      <p class="gate-switch">
+        <span id="switch-text">New here?</span>
+        <button type="button" class="linkish" id="switch-mode">Create an account</button>
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<nav class="nav" id="app-nav" hidden>
   <div class="brand">
     <h1>Health Coach</h1>
     <p>Multi-agent wellness</p>
@@ -46,6 +113,10 @@
   </div>
 
   <div class="nav-foot">
+    <div class="whoami">
+      <span id="who">&nbsp;</span>
+      <button class="linkish" id="signout" type="button">Sign out</button>
+    </div>
     <div class="svc" id="svc">connecting</div>
     <div class="row">
       <button class="btn subtle small" id="theme-toggle" type="button">Dark</button>
@@ -54,7 +125,7 @@
   </div>
 </nav>
 
-<main class="stage">
+<main class="stage" id="app-stage" hidden>
 
   <!-- ============ TODAY ============ -->
   <section class="page" id="page-today">

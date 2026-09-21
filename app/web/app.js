@@ -7,13 +7,27 @@
    =================================================================== */
 
 const $ = id => document.getElementById(id);
+
+// A session can end while the page is still open: the cookie expires, or
+// the account is signed out in another tab. Every data call goes through
+// here, so one place notices and puts the sign-in screen back rather than
+// letting the page quietly fill with blanks.
+function watchForSignOut(response, path) {
+  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+    showGate('Your session ended. Please sign in again.');
+  }
+  return response;
+}
+
 const api = {
-  get: path => fetch(path).then(r => r.json()),
+  get: path => fetch(path)
+    .then(r => watchForSignOut(r, path))
+    .then(r => r.json()),
   post: (path, body) => fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {}),
-  }),
+  }).then(r => watchForSignOut(r, path)),
 };
 
 const state = { trace: [], progress: null, lastReply: '' };
@@ -1102,10 +1116,98 @@ function showEphemeralNotice() {
   document.querySelector('.stage').prepend(bar);
 }
 
+/* ---------------- signing in ----------------
+   One screen, two modes. Creating an account and signing in differ by two
+   fields and one endpoint, so they share a form rather than living on
+   separate pages that then have to be kept looking alike. */
+
+let signingUp = false;
+
+function showGate(message) {
+  $('gate').hidden = false;
+  $('app-nav').hidden = true;
+  $('app-stage').hidden = true;
+  if (message) showAuthErrors([message]);
+}
+
+function hideGate() {
+  $('gate').hidden = true;
+  $('app-nav').hidden = false;
+  $('app-stage').hidden = false;
+}
+
+function showAuthErrors(list) {
+  const box = $('auth-errors');
+  if (!list || !list.length) { box.hidden = true; box.textContent = ''; return; }
+  box.hidden = false;
+  box.innerHTML = list.map(e => `<div>${escapeHtml(e)}</div>`).join('');
+}
+
+function setMode(wantSignup) {
+  signingUp = wantSignup;
+  showAuthErrors([]);
+  $('tab-signin').classList.toggle('is-on', !wantSignup);
+  $('tab-signup').classList.toggle('is-on', wantSignup);
+  $('field-name').hidden = !wantSignup;
+  $('field-sample').hidden = !wantSignup;
+  $('auth-submit').textContent = wantSignup ? 'Create account' : 'Sign in';
+  $('auth-password').setAttribute('autocomplete',
+    wantSignup ? 'new-password' : 'current-password');
+  $('switch-text').textContent = wantSignup
+    ? 'Already have an account?' : 'New here?';
+  $('switch-mode').textContent = wantSignup ? 'Sign in' : 'Create an account';
+}
+
+$('tab-signin').addEventListener('click', () => setMode(false));
+$('tab-signup').addEventListener('click', () => setMode(true));
+$('switch-mode').addEventListener('click', () => setMode(!signingUp));
+
+$('auth-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const button = $('auth-submit');
+  const wasLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = signingUp ? 'Creating' : 'Signing in';
+  showAuthErrors([]);
+
+  const body = {
+    email: $('auth-email').value.trim(),
+    password: $('auth-password').value,
+  };
+  if (signingUp) {
+    body.name = $('auth-name').value.trim();
+    body.sample_data = $('auth-sample').checked;
+  }
+
+  try {
+    const res = await api.post(
+      signingUp ? '/api/auth/signup' : '/api/auth/login', body);
+    const data = await res.json();
+    if (!data.ok) {
+      showAuthErrors(data.errors || ['That did not work. Try again.']);
+      return;
+    }
+    $('auth-password').value = '';
+    await startApp(data.user);
+  } catch (err) {
+    showAuthErrors(['Could not reach the server. Check your connection.']);
+  } finally {
+    button.disabled = false;
+    button.textContent = wasLabel;
+  }
+});
+
+$('signout').addEventListener('click', async () => {
+  await api.post('/api/auth/logout');
+  location.reload();
+});
+
 /* ---------------- boot ---------------- */
 
-async function boot() {
-  setTheme(currentTheme());
+async function startApp(user) {
+  hideGate();
+  $('who').textContent = user.name || user.email;
+  $('who').title = user.email;
 
   try {
     const h = await api.get('/api/health');
@@ -1118,17 +1220,28 @@ async function boot() {
       : 'No Azure services configured, using local rules';
 
     // Say so when the host cannot keep data. Silently losing what someone
-    // logged is worse than telling them it is a preview.
+    // logged is worse than letting them believe it was saved.
     if (h.storage === 'ephemeral') showEphemeralNotice();
   } catch (e) { $('svc').textContent = 'server unreachable'; }
 
-  // An installed shortcut can open straight into voice: /?voice=1
+  // An installed shortcut can open straight into the coach: /?voice=1
   if (new URLSearchParams(location.search).get('voice') === '1') {
-    location.hash = '#voice';
+    location.hash = '#coach';
   }
   renderMoodScale(null);
   loadProfile().catch(() => { /* profile is optional */ });
   route();
+}
+
+async function boot() {
+  setTheme(currentTheme());
+  setMode(false);
+  try {
+    const me = await api.get('/api/auth/me');
+    if (me.user) { await startApp(me.user); return; }
+  } catch (e) { /* offline: the sign-in screen is the honest fallback */ }
+  showGate();
+  $('auth-email').focus();
 }
 
 boot();
