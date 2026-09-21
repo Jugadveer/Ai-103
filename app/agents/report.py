@@ -26,14 +26,15 @@ class ReportAgent(BaseAgent):
         # A question about the subject deserves an answer, not this
         # agent's analysis. "Why do streaks help with habits" is not a
         # request for the current streak.
-        spoken = self.try_answer(query)
+        peers = self.bus.broadcast(
+            self.name, reason="compiling health summary",
+        ) if self.bus else {}
+
+        spoken = self.try_answer(query, peers)
         if spoken:
             return AgentReply(agent=self.name, text=spoken,
                               data={"answered": True})
 
-        peers = self.bus.broadcast(
-            self.name, reason="compiling health summary",
-        ) if self.bus else {}
         text = self.build(peers)
         return AgentReply(agent=self.name, text=text,
                           data={"report": text, "peers": peers})

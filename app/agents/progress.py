@@ -79,12 +79,15 @@ class ProgressAgent(BaseAgent):
         # A question about the subject deserves an answer, not this
         # agent's analysis. "Why do streaks help with habits" is not a
         # request for the current streak.
-        spoken = self.try_answer(query)
+        # Gathered once. try_answer used to build its own copy for
+        # grounding and the fallback below built another, which put 17
+        # hops in the trace for one question.
+        f = self.report()
+
+        spoken = self.try_answer(query, {self.name: f})
         if spoken:
             return AgentReply(agent=self.name, text=spoken,
-                              data={"answered": True})
-
-        f = self.report()
+                              data={**f, "answered": True})
         if f["days_logged"] == 0:
             return AgentReply(
                 agent=self.name,

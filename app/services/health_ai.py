@@ -43,7 +43,22 @@ their actual numbers rather than speaking in generalities.
 hour" is useful. "Practise good sleep hygiene" is not.
 - Write 2 to 4 short sentences. No lists, no headings, no markdown.
 - Plain, calm, everyday language. No hedging padding like "it is \
-important to note that"."""
+important to note that".
+
+If the question has nothing at all to do with health, the body, food, \
+sleep, movement, mood, or this person's own logged data, reply with \
+exactly NOT_HEALTH and nothing else. Only for genuinely unrelated \
+questions: anything a person might reasonably ask a wellness app is in \
+scope, and a question about their own logged numbers always is."""
+
+# The model's way of saying a question was not for it. Turned into a
+# real sentence for the user rather than leaked out as a token.
+OFF_TOPIC = "NOT_HEALTH"
+OFF_TOPIC_REPLY = (
+    "That one is outside what I do. I can help with sleep, food, water, "
+    "movement, mood and how you have been feeling, and I can show you "
+    "patterns in what you have logged."
+)
 
 # A last line of defence. If an answer names a condition or reaches for
 # medication despite the prompt, it is discarded rather than shown.
@@ -102,11 +117,22 @@ def answer(question: str, context: dict | None = None,
 
     reply = reply.strip().strip('"')
 
+    # Asked about something that is not health at all. Said plainly,
+    # rather than routed to whichever agent the question least resembled
+    # and answered with that agent's statistics.
+    if reply.upper().startswith(OFF_TOPIC):
+        return OFF_TOPIC_REPLY
+
     if FORBIDDEN.search(reply):
         log.warn("health_answer_blocked", snippet=reply[:90])
         return ""
 
     return reply
+
+
+# Domains with a hand-written line above. Everything else is rendered
+# generically by the loop at the end of _describe.
+_DESCRIBED = ("sleep", "hydration", "nutrition", "activity", "mood", "vitals")
 
 
 def _describe(context: dict) -> str:
@@ -148,6 +174,24 @@ def _describe(context: dict) -> str:
     vitals = context.get("vitals") or {}
     if vitals.get("bmi"):
         lines.append(f"- BMI {vitals['bmi']}, {vitals['bmi_band']}")
+
+    # Anything else gets a plain rendering rather than being dropped.
+    #
+    # The lines above cover the seven domains that hold data. The
+    # meta-agents pass their own report instead, and every one of those
+    # used to fall through this function and produce nothing, so the
+    # model was asked "what is my streak" with no streak in front of it
+    # and said it had no access to the data. It was right. Now an
+    # unrecognised report is summarised generically, which also means the
+    # next agent added works without editing this file.
+    for name, report in (context or {}).items():
+        if name in _DESCRIBED or not isinstance(report, dict):
+            continue
+        facts = [f"{k.replace('_', ' ')} {v}" for k, v in report.items()
+                 if isinstance(v, (int, float, str)) and not isinstance(v, bool)
+                 and k not in ("status", "has_data") and v != ""]
+        if facts:
+            lines.append(f"- {name}: " + ", ".join(facts[:8]))
 
     return "\n".join(lines)
 

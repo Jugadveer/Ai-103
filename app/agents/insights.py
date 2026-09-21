@@ -27,14 +27,17 @@ class InsightsAgent(BaseAgent):
         # A question about the subject deserves an answer, not this
         # agent's analysis. "Why do streaks help with habits" is not a
         # request for the current streak.
-        spoken = self.try_answer(query)
+        peers = self.bus.broadcast(
+            self.name, reason="correlation scan",
+        ) if self.bus else {}
+
+        # Every peer's report is exactly the grounding a general question
+        # wants, and it has already been gathered.
+        spoken = self.try_answer(query, peers)
         if spoken:
             return AgentReply(agent=self.name, text=spoken,
                               data={"answered": True})
 
-        peers = self.bus.broadcast(
-            self.name, reason="correlation scan",
-        ) if self.bus else {}
         found = self.find_patterns(peers)
 
         if not found:
