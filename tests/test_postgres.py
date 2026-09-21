@@ -169,3 +169,31 @@ def test_a_reading_survives_whichever_type_the_backend_returns(
     assert isinstance(today["value"], (int, float))
     # And it has to survive the trip to the page.
     assert json.loads(json.dumps(today))["value"] == expected
+
+
+# --- a bug that has happened twice ----------------------------------------
+
+def test_no_source_file_contains_a_control_character():
+    """
+    Twice now a regex has reached the repository with its \b word
+    boundaries turned into literal backspace characters, written by a
+    patch script whose replacement text was not a raw string. The regex
+    still compiles. It just quietly matches nothing, so a guardrail looks
+    present in review and is inert at runtime.
+
+    Backspace is never legitimate in this codebase, so it is worth one
+    assertion rather than another afternoon.
+    """
+    import unicodedata
+    offenders = []
+    for path in SOURCES + sorted((ROOT / "tests").rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        for index, char in enumerate(text):
+            if unicodedata.category(char) == "Cc" and char not in "\n\t\r":
+                line = text[:index].count("\n") + 1
+                offenders.append(
+                    f"{path.relative_to(ROOT).as_posix()}:{line} "
+                    f"U+{ord(char):04X}")
+    assert not offenders, ("Control characters in source, probably a \b "
+                           "eaten by a non-raw string:\n  "
+                           + "\n  ".join(offenders))

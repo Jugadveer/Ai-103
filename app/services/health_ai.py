@@ -135,6 +135,74 @@ def answer(question: str, context: dict | None = None,
 _DESCRIBED = ("sleep", "hydration", "nutrition", "activity", "mood", "vitals")
 
 
+REFERRAL_PROMPT = """Someone has described how they feel and asked what is wrong with them. You must not tell them, and a bare refusal leaves them exactly where they started, which helps nobody.
+
+Give them the most useful thing you can without naming anything:
+
+- Which kind of clinician is the right one. Be specific where the description supports it: a dentist, a dermatologist, an eye specialist, a physiotherapist, a gynaecologist, an ENT specialist, a GP or family doctor when it could be several things, or emergency care when it sounds urgent.
+- How soon. Today, within a few days, or at a routine appointment.
+- What to bring or mention, if something specific would help them, such as how long it has gone on or what makes it worse.
+
+Hard limits:
+- Never name, suggest, hint at or rule out any condition or disease. Not even to reassure.
+- Never mention medication, supplements or doses.
+- Never say it is probably nothing or probably fine.
+- Say plainly, once, that you cannot tell them what it is.
+
+Three or four short sentences. Plain language. No lists, no headings."""
+
+
+# Diagnosis as a sentence shape, not as a list of diseases.
+#
+# FORBIDDEN names about fifteen conditions. There are thousands, so a
+# referral could sail past it with "this sounds like eczema" and that is
+# a diagnosis however short the word is. What can be pinned down is the
+# act: "sounds like X" is the same sentence whatever X is.
+#
+# This is deliberately strict, and only applied to referrals, where the
+# expected answer is a clinician and a timeframe and none of these
+# phrasings belong. Tripping it costs a nicer message and falls back to
+# the plain refusal, so over-blocking here is cheap. That is the opposite
+# of the general answer path, where over-blocking silently swallowed good
+# answers and left people staring at statistics.
+NAMING_A_CONDITION = re.compile(
+    r"(?:sounds?|looks?|seems) like"
+    r"|consistent with|indicative of|suggestive of|points? to"
+    r"|\byou (?:may |might |probably )?have\b"
+    r"|\b(?:could|might|may) be (?!worth|helpful|useful|a good|best)"
+    r"|\bit(?:'s| is) (?:probably|likely|most likely)\b",
+    re.IGNORECASE)
+
+
+def referral(message: str) -> str:
+    """
+    What to do about it, when we will not say what it is.
+
+    A refusal is not the same as being careful. Someone who asks what is
+    wrong is asking because they are worried, and the honest useful
+    answer is who should look at this and how soon, which is triage
+    rather than diagnosis. The naming of a condition is the part a
+    clinician has to do, and that stays refused.
+
+    Returns '' when the model is unavailable or the reply crossed a line,
+    so the caller can fall back to the plain refusal.
+    """
+    if not llm.available() or not (message or "").strip():
+        return ""
+    reply = llm.chat(REFERRAL_PROMPT, message.strip(), temperature=0.3)
+    if not reply:
+        return ""
+    reply = reply.strip().strip('"')
+    # Two guardrails: the shared one for medication and the named
+    # conditions we know, and a stricter one for the act of naming
+    # anything at all. A referral that names a condition is a diagnosis
+    # wearing a hat.
+    if FORBIDDEN.search(reply) or NAMING_A_CONDITION.search(reply):
+        log.warn("referral_blocked", snippet=reply[:90])
+        return ""
+    return reply
+
+
 def _describe(context: dict) -> str:
     """
     Turn agent reports into plain lines the model can quote back.
