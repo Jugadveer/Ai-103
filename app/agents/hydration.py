@@ -30,8 +30,9 @@ class HydrationAgent(BaseAgent):
 
     def report(self) -> dict:
         rows = db.query(
-            "SELECT COALESCE(SUM(glasses), 0) AS total FROM water WHERE day = ?",
-            (db.today(),),
+            "SELECT COALESCE(SUM(glasses), 0) AS total FROM water "
+            "WHERE user_id = ? AND day = ?",
+            (db.current_user(), db.today()),
         )
         total = rows[0]["total"] if rows else 0
         return {

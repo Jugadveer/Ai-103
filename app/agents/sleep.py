@@ -29,7 +29,8 @@ class SleepAgent(BaseAgent):
 
     def report(self) -> dict:
         rows = db.query(
-            "SELECT day, hours FROM sleep ORDER BY day DESC LIMIT 7"
+            "SELECT day, hours FROM sleep WHERE user_id = ? "
+            "ORDER BY day DESC LIMIT 7", (db.current_user(),)
         )
         hours = [r["hours"] for r in rows]
         last_night = rows[0]["hours"] if rows else 0

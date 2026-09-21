@@ -251,7 +251,9 @@ class CoachAgent(BaseAgent):
         )
 
     def _take_medication(self) -> AgentReply:
-        meds = db.query("SELECT id, name FROM medications WHERE active = 1")
+        meds = db.query("SELECT id, name FROM medications "
+                        "WHERE user_id = ? AND active = 1",
+                        (db.current_user(),))
         if not meds:
             return AgentReply(agent=self.name,
                               text="You haven't added any medications yet.")

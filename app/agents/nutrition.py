@@ -298,7 +298,8 @@ class NutritionAgent(BaseAgent):
     def report(self) -> dict:
         rows = db.query(
             "SELECT COUNT(*) AS n, COALESCE(SUM(calories), 0) AS cals "
-            "FROM meals WHERE day = ?", (db.today(),))
+            "FROM meals WHERE user_id = ? AND day = ?",
+            (db.current_user(), db.today()))
         n = rows[0]["n"] if rows else 0
         cals = rows[0]["cals"] if rows else 0
         return {

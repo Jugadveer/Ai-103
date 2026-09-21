@@ -61,7 +61,8 @@ class MoodAgent(BaseAgent):
 
     def report(self) -> dict:
         rows = db.query(
-            "SELECT score, day FROM mood ORDER BY id DESC LIMIT 14")
+            "SELECT score, day FROM mood WHERE user_id = ? "
+            "ORDER BY id DESC LIMIT 14", (db.current_user(),))
         scores = [r["score"] for r in rows]
         n = len(scores)
         avg = round(sum(scores) / n, 1) if n else 0.0

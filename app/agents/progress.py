@@ -170,7 +170,9 @@ class ProgressAgent(BaseAgent):
     def _best(self, table: str, column: str) -> float:
         rows = db.query(
             f"SELECT MAX(total) m FROM "
-            f"(SELECT SUM({column}) total FROM {table} GROUP BY day)")
+            f"(SELECT SUM({column}) total FROM {table} "
+            f"WHERE user_id = ? GROUP BY day) best",
+            (db.current_user(),))
         return rows[0]["m"] or 0 if rows else 0
 
     def _streaks(self) -> tuple[int, int, int]:

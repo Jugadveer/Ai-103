@@ -34,10 +34,12 @@ class ActivityAgent(BaseAgent):
     def report(self) -> dict:
         t = db.query(
             "SELECT COALESCE(SUM(steps),0) s, COALESCE(SUM(minutes),0) m "
-            "FROM activity WHERE day = ?", (db.today(),))[0]
+            "FROM activity WHERE user_id = ? AND day = ?",
+            (db.current_user(), db.today()))[0]
         w = db.query(
             "SELECT COALESCE(SUM(minutes),0) m, COUNT(DISTINCT day) d "
-            "FROM activity WHERE day >= ?", (db.days_ago(6),))[0]
+            "FROM activity WHERE user_id = ? AND day >= ?",
+            (db.current_user(), db.days_ago(6)))[0]
         return {
             "has_data": bool(t["s"] or t["m"] or w["m"]),
             "steps_today": t["s"],

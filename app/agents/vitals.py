@@ -68,8 +68,9 @@ class VitalsAgent(BaseAgent):
 
     def _latest(self, metric: str) -> dict | None:
         rows = db.query(
-            "SELECT value, secondary, day FROM vitals WHERE metric = ? "
-            "ORDER BY id DESC LIMIT 1", (metric,))
+            "SELECT value, secondary, day FROM vitals "
+            "WHERE user_id = ? AND metric = ? "
+            "ORDER BY id DESC LIMIT 1", (db.current_user(), metric))
         return rows[0] if rows else None
 
     def report(self) -> dict:

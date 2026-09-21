@@ -114,7 +114,8 @@ class ReportAgent(BaseAgent):
                 f"{meds['adherence_week_pct']}% adherence this week")
 
         recent = db.query(
-            "SELECT note, day FROM symptoms ORDER BY id DESC LIMIT 5")
+            "SELECT note, day FROM symptoms WHERE user_id = ? "
+            "ORDER BY id DESC LIMIT 5", (db.current_user(),))
         if recent:
             lines.append("")
             lines.append("REPORTED SYMPTOMS")

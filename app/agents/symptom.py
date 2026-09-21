@@ -130,5 +130,6 @@ class SymptomAgent(BaseAgent):
         return " ".join(parts)
 
     def report(self) -> dict:
-        rows = db.query("SELECT note, day FROM symptoms ORDER BY id DESC LIMIT 5")
+        rows = db.query("SELECT note, day FROM symptoms WHERE user_id = ? "
+                        "ORDER BY id DESC LIMIT 5", (db.current_user(),))
         return {"recent_symptoms": [r["note"] for r in rows], "count": len(rows)}

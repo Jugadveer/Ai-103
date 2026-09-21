@@ -42,16 +42,19 @@ class MedicationAgent(BaseAgent):
 
     def report(self) -> dict:
         meds = db.query(
-            "SELECT id, name FROM medications WHERE active = 1")
+            "SELECT id, name FROM medications "
+            "WHERE user_id = ? AND active = 1", (db.current_user(),))
         taken_ids = {
             r["med_id"] for r in
-            db.query("SELECT med_id FROM med_log WHERE day = ? AND taken = 1",
-                     (db.today(),))
+            db.query("SELECT med_id FROM med_log "
+                     "WHERE user_id = ? AND day = ? AND taken = 1",
+                     (db.current_user(), db.today()))
         }
         pending = [m["name"] for m in meds if m["id"] not in taken_ids]
         week = db.query(
-            "SELECT COUNT(*) c FROM med_log WHERE day >= ? AND taken = 1",
-            (db.days_ago(6),))[0]["c"]
+            "SELECT COUNT(*) c FROM med_log "
+            "WHERE user_id = ? AND day >= ? AND taken = 1",
+            (db.current_user(), db.days_ago(6)))[0]["c"]
         expected = len(meds) * 7
         return {
             "has_data": bool(meds),
