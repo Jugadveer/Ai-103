@@ -7,12 +7,12 @@ Open  :  http://127.0.0.1:8000
 import pathlib
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import config
+from app import auth, config
 from app.agents.activity import ActivityAgent
 from app.agents.assessment import AssessmentAgent
 from app.agents.bus import AgentBus
@@ -32,26 +32,18 @@ from app.core.errors import ValidationError
 from app.core.validation import check_number
 from app.services import llm as speech_llm
 from app.services import speech
-from app.store import db
+from app.store import db, users
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Startup: make sure the database and its tables exist."""
     db.init_db()
-
-    # A fresh deployment should not greet a tester with an empty app. This
-    # only fires when nothing has ever been logged, so a host with a real
-    # disk seeds once and never touches the data again.
-    if config.SEED_ON_EMPTY:
-        from scripts.seed import is_empty, seed_demo_data
-        if is_empty():
-            seed_demo_data()
-            log.info("seeded_on_empty")
-
     log.info("startup", mock_mode=config.MOCK_MODE,
              agents=len(bus.agents),
-             storage="persistent" if config.STORAGE_PERSISTENT else "ephemeral")
+             accounts=users.count(),
+             storage=config.STORAGE_BACKEND,
+             persistent=config.STORAGE_PERSISTENT)
     yield
 
 
@@ -87,6 +79,27 @@ def build_bus() -> AgentBus:
 
 bus = build_bus()
 WEB_DIR = pathlib.Path(__file__).parent / "web"
+
+
+async def signed_in(request: Request) -> dict:
+    """
+    Every endpoint below that reads or writes a health record depends on
+    this. It resolves the session cookie, points storage at that account
+    and refuses the request if there is nobody behind it.
+
+    Refusing is the safe direction. With no account resolved the storage
+    layer answers for user 0, which owns nothing, so an unauthenticated
+    request would get empty readings rather than someone else's. The 401
+    is still better: the page can show the sign-in screen instead of a
+    dashboard full of zeroes.
+    """
+    user = await auth.current_user(request)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    return user
+
+
+Signed = Depends(signed_in)
 
 
 class ChatRequest(BaseModel):
@@ -125,9 +138,11 @@ def health():
         "status": "ok",
         "mock_mode": config.MOCK_MODE,
         "agents": list(bus.agents),
-        # Honest about the host. On a serverless platform the container is
-        # discarded between requests, so anything saved may not survive.
+        # Honest about the host. A file-backed database on a serverless
+        # platform is thrown away between requests; Postgres is not.
         "storage": "persistent" if config.STORAGE_PERSISTENT else "ephemeral",
+        "backend": config.STORAGE_BACKEND,
+        "accounts": users.count(),
         "azure": {
             "openai": bool(config.AZURE_OPENAI_API_KEY),
             "search": bool(config.AZURE_SEARCH_API_KEY),
@@ -147,7 +162,7 @@ def agents():
 
 
 @app.post("/api/chat")
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, user: dict = Signed):
     """Main endpoint. Returns the reply plus the full agent-to-agent trace."""
     bus.reset_trace()
     reply = bus.get("coach").safe_handle(req.message)
@@ -165,7 +180,7 @@ class SpeakRequest(BaseModel):
 
 
 @app.post("/api/speak")
-def speak(req: SpeakRequest):
+def speak(req: SpeakRequest, user: dict = Signed):
     """
     Azure AI Speech text-to-speech. Returns WAV audio.
 
@@ -179,7 +194,7 @@ def speak(req: SpeakRequest):
 
 
 @app.post("/api/transcribe")
-async def transcribe(request: Request):
+async def transcribe(request: Request, user: dict = Signed):
     """
     Speech to text through Azure AI Speech.
 
@@ -208,13 +223,13 @@ async def transcribe(request: Request):
 
 
 @app.get("/api/dashboard")
-def dashboard():
+def dashboard(user: dict = Signed):
     """Every agent's current report - used by the UI panels."""
     return {name: agent.safe_report() for name, agent in bus.agents.items()}
 
 
 @app.get("/api/history")
-def history(days: int = 14):
+def history(days: int = 14, user: dict = Signed):
     """Per-day series for every tracked metric, gaps preserved as null."""
     days = max(3, min(90, days))
     return db.all_series(days)
@@ -227,7 +242,7 @@ class ProfileEntry(BaseModel):
 
 
 @app.get("/api/profile")
-def read_profile():
+def read_profile(user: dict = Signed):
     from app.core.energy import ACTIVITY_LEVELS
     return {
         "profile": db.get_profile(),
@@ -236,7 +251,7 @@ def read_profile():
 
 
 @app.post("/api/profile")
-def save_profile(req: ProfileEntry):
+def save_profile(req: ProfileEntry, user: dict = Signed):
     """Age, sex and activity level. Used only to estimate energy needs."""
     from app.core.energy import ACTIVITY_LEVELS
     errors = []
@@ -256,7 +271,7 @@ def save_profile(req: ProfileEntry):
 
 
 @app.get("/api/assessment")
-def assessment():
+def assessment(user: dict = Signed):
     """The whole-picture review, including the energy calculation."""
     bus.reset_trace()
     reply = bus.get("assessment").safe_handle("review")
@@ -264,7 +279,7 @@ def assessment():
 
 
 @app.get("/api/progress")
-def progress():
+def progress(user: dict = Signed):
     """Daily goal rings, streaks, achievements and level."""
     return bus.get("progress").safe_report()
 
@@ -285,7 +300,7 @@ QUICK_ACTIONS = {
 
 
 @app.post("/api/quicklog")
-def quicklog(req: QuickLog):
+def quicklog(req: QuickLog, user: dict = Signed):
     """
     One-tap logging from the Today screen.
 
@@ -309,7 +324,7 @@ class PhotoRequest(BaseModel):
 
 
 @app.post("/api/photo")
-def photo(req: PhotoRequest):
+def photo(req: PhotoRequest, user: dict = Signed):
     """
     Log a meal from a photograph.
 
@@ -352,7 +367,7 @@ class VitalsEntry(BaseModel):
 
 
 @app.post("/api/vitals")
-def save_vitals(req: VitalsEntry):
+def save_vitals(req: VitalsEntry, user: dict = Signed):
     saved, errors = [], []
 
     def attempt(metric, value, secondary=None):
@@ -374,8 +389,74 @@ def save_vitals(req: VitalsEntry):
             "vitals": bus.get("vitals").safe_report()}
 
 
+# --- accounts ------------------------------------------------------------
+
+class SignupRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    name: str = Field(min_length=1, max_length=60)
+    password: str = Field(min_length=1, max_length=200)
+    # A brand new account has nothing in it, and an app of empty charts
+    # tells you nothing about whether it works. This fills it with the
+    # same demo month the tests use, for the person who asked for it.
+    sample_data: bool = False
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=1, max_length=200)
+
+
+@app.get("/api/auth/me")
+async def whoami(request: Request):
+    """Who is signed in, if anyone. The page asks this before it draws."""
+    user = await auth.current_user(request)
+    return {"user": user}
+
+
+@app.post("/api/auth/signup")
+def signup(req: SignupRequest, request: Request, response: Response):
+    problems = users.validate_signup(req.email, req.name, req.password)
+    if problems:
+        response.status_code = 400
+        return {"ok": False, "errors": problems}
+    try:
+        user = users.create(req.email, req.name, req.password)
+    except ValidationError as exc:
+        response.status_code = 400
+        return {"ok": False, "errors": [exc.user_message]}
+
+    auth.set_cookie(response, request, user["id"])
+    log.info("signup", user=user["id"])
+
+    if req.sample_data:
+        from scripts.seed import seed_demo_data
+        db.CURRENT_USER.set(user["id"])
+        seed_demo_data()
+
+    return {"ok": True, "user": user}
+
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest, request: Request, response: Response):
+    user = users.authenticate(req.email, req.password)
+    if user is None:
+        response.status_code = 401
+        # Deliberately the same message either way. Saying "no such
+        # account" would let anyone check which emails are registered.
+        return {"ok": False, "errors": ["That email and password do not match."]}
+    auth.set_cookie(response, request, user["id"])
+    log.info("login", user=user["id"])
+    return {"ok": True, "user": user}
+
+
+@app.post("/api/auth/logout")
+def logout(response: Response):
+    auth.clear_cookie(response)
+    return {"ok": True}
+
+
 @app.post("/api/seed")
-def seed():
+def seed(user: dict = Signed):
     """Load the demo dataset. Development helper, not part of the product."""
     from scripts.seed import seed_demo_data
     seed_demo_data()

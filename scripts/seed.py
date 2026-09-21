@@ -167,7 +167,32 @@ def is_empty() -> bool:
     return not db.logged_days(days=3650)
 
 
+def seed_local_account(email: str = "demo@local", password: str = "demo1234",
+                       name: str = "Demo") -> dict:
+    """
+    Make a local account and fill it with the demo month.
+
+    Every row belongs to somebody now, so seeding with nobody signed in
+    would write a month of history that no account can ever see. This
+    gives the data an owner you can actually sign in as.
+    """
+    from app.core.errors import ValidationError
+    from app.store import users
+
+    db.init_db()
+    try:
+        user = users.create(email, name, password)
+    except ValidationError:
+        user = users.public(users.find_by_email(email))
+    db.CURRENT_USER.set(user["id"])
+    seed_demo_data()
+    return user
+
+
 if __name__ == "__main__":
     from app import config
-    seed_demo_data()
-    print(f"Seeded {DAYS} days into {config.DB_PATH}")
+
+    account = seed_local_account()
+    where = config.DATABASE_URL and "Postgres" or config.DB_PATH
+    print(f"Seeded {DAYS} days into {where}")
+    print(f"Sign in as  {account['email']}  /  demo1234")
