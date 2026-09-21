@@ -21,6 +21,10 @@ services:
         value: /data/health_coach.db
       - key: MOCK_MODE
         value: "false"
+      # Seeds the demo month on first boot only, so testers land on a
+      # populated app rather than an empty one. Never overwrites data.
+      - key: SEED_ON_EMPTY
+        value: "true"
       - key: PYTHON_VERSION
         value: "3.11.0"
       # Set these in the Render dashboard, never in this file.

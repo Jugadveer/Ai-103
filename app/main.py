@@ -39,7 +39,19 @@ from app.store import db
 async def lifespan(_app: FastAPI):
     """Startup: make sure the database and its tables exist."""
     db.init_db()
-    log.info("startup", mock_mode=config.MOCK_MODE, agents=len(bus.agents))
+
+    # A fresh deployment should not greet a tester with an empty app. This
+    # only fires when nothing has ever been logged, so a host with a real
+    # disk seeds once and never touches the data again.
+    if config.SEED_ON_EMPTY:
+        from scripts.seed import is_empty, seed_demo_data
+        if is_empty():
+            seed_demo_data()
+            log.info("seeded_on_empty")
+
+    log.info("startup", mock_mode=config.MOCK_MODE,
+             agents=len(bus.agents),
+             storage="persistent" if config.STORAGE_PERSISTENT else "ephemeral")
     yield
 
 

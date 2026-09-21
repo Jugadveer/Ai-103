@@ -157,3 +157,59 @@ def test_service_worker_is_served_from_the_root(client):
 def test_static_assets_are_served(client):
     for path in ["/static/app.css", "/static/app.js", "/static/icon.svg"]:
         assert client.get(path).status_code == 200, path
+
+
+# --- the demo dataset -------------------------------------------------
+
+def test_the_seed_covers_a_month(clean_db):
+    from scripts.seed import DAYS, seed_demo_data
+    seed_demo_data()
+    assert DAYS == 30
+    assert len(db.logged_days(days=60)) >= 25
+
+
+def test_the_seed_leaves_gaps_for_the_charts(clean_db):
+    """A day with no log must show as a gap, not a zero, so the seed
+    deliberately skips a few days to give the charts something to draw."""
+    from scripts.seed import seed_demo_data
+    seed_demo_data()
+    values = [p["value"] for p in db.series("sleep", 30)["points"]]
+    assert None in values
+    assert values.count(None) >= 2
+
+
+def test_the_seed_is_reproducible(clean_db):
+    """The same numbers have to appear in a recorded video every time."""
+    from scripts.seed import seed_demo_data
+    seed_demo_data()
+    first = db.series("sleep", 30)["points"]
+    seed_demo_data()
+    assert db.series("sleep", 30)["points"] == first
+
+
+def test_the_seed_produces_the_sleep_and_mood_correlation(bus, clean_db):
+    """
+    The headline insight of the whole project. If the seeded mood does not
+    actually track the seeded sleep, the demo has nothing to show.
+    """
+    from scripts.seed import seed_demo_data
+    seed_demo_data()
+    fresh = __import__("app.main", fromlist=["build_bus"]).build_bus()
+    patterns = fresh.get("insights").handle("patterns").data["patterns"]
+    joined = " ".join(p["insight"] for p in patterns).lower()
+    assert "mood" in joined and "sleep" in joined
+
+
+def test_the_seed_fills_the_profile_so_the_review_works(clean_db):
+    """Otherwise the Review page opens a conversation instead of a result."""
+    from scripts.seed import seed_demo_data
+    seed_demo_data()
+    profile = db.get_profile()
+    assert profile.get("age") and profile.get("activity_level")
+
+
+def test_is_empty_detects_a_fresh_database(clean_db):
+    from scripts.seed import is_empty, seed_demo_data
+    assert is_empty() is True
+    seed_demo_data()
+    assert is_empty() is False

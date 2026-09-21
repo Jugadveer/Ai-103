@@ -32,6 +32,12 @@ AZURE_SPEECH_VOICE = _get("AZURE_SPEECH_VOICE", "en-IN-NeerjaNeural")
 AZURE_CONTENT_SAFETY_ENDPOINT = _get("AZURE_CONTENT_SAFETY_ENDPOINT")
 AZURE_CONTENT_SAFETY_KEY = _get("AZURE_CONTENT_SAFETY_KEY")
 
+# Populate a fresh deployment with the demo month, so a tester never
+# lands on an empty app. Only ever runs when nothing has been logged, so
+# it cannot overwrite real data on a host with a persistent disk.
+SEED_ON_EMPTY = _get("SEED_ON_EMPTY", "false").lower() == "true"
+
+
 # --- storage -------------------------------------------------------------
 # Serverless hosts give a read-only filesystem with one writable temp
 # directory, and the container is thrown away between requests. So the

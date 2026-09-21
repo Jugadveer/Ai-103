@@ -43,6 +43,17 @@ still there when a tester comes back. `render.yaml` is committed.
    `AZURE_CONTENT_SAFETY_ENDPOINT`, `AZURE_CONTENT_SAFETY_KEY`
 4. Deploy, then check `/api/health` reads `"storage": "persistent"`
 
+`SEED_ON_EMPTY` is set in `render.yaml`, so the first boot writes a month
+of demo history and a tester lands on a populated app. It only ever runs
+when nothing has been logged, so a restart never touches real data. Once
+your team starts entering their own, the seed will not fire again.
+
+To reset the hosted data deliberately:
+
+```bash
+curl -X POST https://<your-host>/api/seed
+```
+
 Note the free plan sleeps after inactivity, so the first request after a
 quiet spell takes a few seconds.
 
