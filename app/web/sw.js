@@ -1,16 +1,17 @@
 /* ===================================================================
    Service worker.
 
-   Its job is to make the installed app open instantly and survive a
-   dropped connection: the shell (page, styles, script, icons) is cached,
-   everything under /api is always fetched live.
+   Its job is to let the app install to a home screen and survive a
+   dropped connection. The shell (page, styles, script, icons) is fetched
+   live and kept as a fallback copy; everything under /api is always live
+   with no fallback at all.
 
    Health data is never cached. A stale reading is worse than no reading,
    and caching it would also leave personal data sitting in a cache the
    user did not ask for.
    =================================================================== */
 
-const CACHE = 'health-coach-v1';
+const CACHE = 'health-coach-v2';
 
 const SHELL = [
   '/',
@@ -48,19 +49,26 @@ self.addEventListener('fetch', event => {
   // Live data only. Never serve a cached health reading.
   if (url.pathname.startsWith('/api/')) return;
 
-  // Shell: serve from cache, refresh in the background.
+  // Shell: network first, cache as the fallback.
+  //
+  // This was cache-first with a background refresh, which meant a deploy
+  // took two page loads to appear: the first served the old file and only
+  // then fetched the new one. Everybody testing this saw the previous
+  // version and reasonably concluded nothing had changed.
+  //
+  // Cache-first buys offline use, but every screen here loads its data
+  // from /api, which is never cached. An offline shell would render empty
+  // furniture and no numbers. So the cache is a fallback for a dropped
+  // connection, not the default path.
   event.respondWith(
-    caches.match(request).then(hit => {
-      const live = fetch(request)
-        .then(response => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE).then(c => c.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => hit);
-      return hit || live;
-    })
+    fetch(request)
+      .then(response => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE).then(c => c.put(request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
