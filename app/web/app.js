@@ -237,7 +237,7 @@ async function refreshTrends() {
         <h3>${escapeHtml(c.title)}</h3>
         <span class="avg">${avg === null ? 'no data'
           : 'avg ' + avg + ' · target ' + c.target}</span>
-        <span class="now">${latest === null ? '—' : latest + c.unit}</span>
+        <span class="now">${latest === null ? '-' : latest + c.unit}</span>
       </header>
       ${barChart(pts, c.target)}
     </div>`;

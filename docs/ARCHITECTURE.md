@@ -17,20 +17,20 @@ Every specialist implements two methods (`app/agents/base.py`):
 | `report()` | **Other agents**, via the bus | Compact facts, as a dict |
 
 `report()` is the inter-agent interface. It is deliberately small and
-structured — facts only, no prose — so a peer can reason over it.
+structured: facts only, no prose, so a peer can reason over it.
 
 ## The bus
 
 `app/agents/bus.py` is the only channel between agents. It does three things:
 
-1. **`register(agent)`** — adds an agent to the mesh and injects the bus into it
-2. **`request(sender, receiver, reason)`** — one agent asks another for its report
-3. **`broadcast(sender, reason)`** — ask every specialist at once
+1. **`register(agent)`** adds an agent to the mesh and injects the bus into it
+2. **`request(sender, receiver, reason)`** has one agent ask another for its report
+3. **`broadcast(sender, reason)`** asks every specialist at once
 
 Every call is appended to `bus.trace` with timestamp, sender, receiver, the
 stated reason, and the returned payload. The API returns that trace with each
 response, and the UI renders it. Cross-agent communication is therefore
-*observable*, not just claimed — which is what makes it demonstrable in the
+*observable* rather than merely claimed, which is what makes it demonstrable in the
 video.
 
 The orchestrator is excluded from `broadcast()` by default: it holds no domain
@@ -41,7 +41,7 @@ data, so including it would add a meaningless hop to the trace.
 ```
 POST /api/chat  { "message": "I keep getting a headache in the afternoon" }
    │
-   ├─ 1. bus.reset_trace()
+   ├─ 1. Bus.reset_trace()
    │
    ├─ 2. CoachAgent.handle()
    │       ├─ safety.check()            ← red flags stop here, before anything
@@ -75,7 +75,7 @@ cheap, local and has no network dependency.
 | Azure OpenAI | Keyword routing and templated replies |
 | Azure AI Search | Keyword search over `data/health_kb/kb.json` |
 | Azure Speech | Text input and output only |
-| *Nothing* | The safety layer — pure Python, always runs |
+| *Nothing* | The safety layer, which is pure Python and always runs |
 
 `MOCK_MODE=true` forces all fallbacks, so the app is fully demonstrable without
 any Azure credentials. This matters for rehearsal and for presentation day if
@@ -90,14 +90,14 @@ app/
   agents/
     base.py              BaseAgent + AgentReply contract
     bus.py               ★ the message bus and trace log
-    coach.py             orchestrator — safety, logging, routing, check-ins
+    coach.py             orchestrator: safety, logging, routing, check-ins
     hydration.py         water intake
     nutrition.py         meals and calories
     sleep.py             sleep hours and debt
     symptom.py           ★ cross-agent correlation + RAG
   services/
     safety.py            ★ red flags and scope guard (no network)
-    search.py            RAG — Azure AI Search with local fallback
+    search.py            RAG, Azure AI Search with a local fallback
     llm.py               Azure OpenAI wrapper
   store/
     db.py                SQLite, plain sqlite3

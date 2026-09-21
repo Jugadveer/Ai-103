@@ -1,9 +1,26 @@
 # Render deployment.
 #
 # Preferred over a serverless host for this app. It is a stateful FastAPI
-# service backed by SQLite, so it needs a filesystem that survives between
-# requests. Render runs it as an ordinary container with a mounted disk,
-# which means data a tester logs is still there when they come back.
+# service backed by SQLite, so it needs a filesystem it can actually write
+# to. Render runs it as an ordinary container, which means a write lands
+# and is still there on the next request. On Vercel it was not.
+#
+# About the free plan and data:
+#
+#   Persistent disks on Render need a paid instance type. On the free plan
+#   the container filesystem is writable but is rebuilt on every deploy,
+#   and a free service also sleeps after about fifteen minutes of no
+#   traffic and starts fresh when it wakes.
+#
+#   So on free: logging works, and what your team logs stays put while the
+#   service is awake. After a quiet spell or a redeploy it resets, and
+#   SEED_ON_EMPTY repopulates the demo month so nobody lands on an empty
+#   app. That is fine for showing the project and testing it.
+#
+#   For data that genuinely survives, switch plan to "starter" and
+#   uncomment the disk block below. Nothing else needs to change: DB_PATH
+#   just moves onto the mounted volume.
+
 services:
   - type: web
     name: health-coach
@@ -12,22 +29,35 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
-    disk:
-      name: health-coach-data
-      mountPath: /data
-      sizeGB: 1
+
+    # Paid plans only. Uncomment together with plan: starter, and change
+    # DB_PATH below to /data/health_coach.db
+    # disk:
+    #   name: health-coach-data
+    #   mountPath: /data
+    #   sizeGB: 1
+
     envVars:
+      # Writable on Render, unlike a serverless host. The app probes for a
+      # writable path at startup anyway and falls back to a temp directory
+      # if this one is not, then reports which it got at /api/health.
       - key: DB_PATH
-        value: /data/health_coach.db
+        value: ./health_coach.db
+
       - key: MOCK_MODE
         value: "false"
-      # Seeds the demo month on first boot only, so testers land on a
-      # populated app rather than an empty one. Never overwrites data.
+
+      # Writes the demo month on first boot, so a tester never lands on an
+      # empty app. Only runs when nothing has ever been logged, so it will
+      # not overwrite what your team enters.
       - key: SEED_ON_EMPTY
         value: "true"
+
       - key: PYTHON_VERSION
         value: "3.11.0"
-      # Set these in the Render dashboard, never in this file.
+
+      # Set these in the Render dashboard. sync: false means Render will
+      # prompt for them and they never live in this file.
       - key: AZURE_OPENAI_ENDPOINT
         sync: false
       - key: AZURE_OPENAI_API_KEY

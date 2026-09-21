@@ -21,7 +21,7 @@ any model, and returns a fixed refusal explaining what the app *can* do.
 ## 2. Emergencies are escalated before anything else runs
 
 **Decision.** A red-flag check runs on every message as the very first
-operation — ahead of routing, ahead of any agent call, ahead of any model
+operation, ahead of routing, ahead of any agent call and ahead of any model
 call.
 
 **Why.** If someone types "chest pain and I can't breathe", the only correct

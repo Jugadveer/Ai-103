@@ -1,263 +1,267 @@
-# Health Coach — A Multi-Agent Wellness Assistant
+# Health Coach
 
-> **AI-103 Group Project · Chitkara University · September 2026**
+A multi-agent wellness assistant built for AI-103 at Chitkara University,
+September 2026.
 
-<!-- TODO: fill in before submission -->
-**Team:** _member 1, member 2, member 3, member 4, member 5_
-**Group:** _group number_
+## Team
 
----
+| Name | Roll number |
+|---|---|
+| Jugadveer | 2410992531 |
+| Ashnoor | 2410992511 |
+| Kanan | 2410992532 |
+| Husan | 2410992561 |
+| Kishika | 24100992540 |
 
-## Problem statement
+## The problem
 
-People already track health data — steps, meals, water, sleep — but each app
-tracks one thing and advises on one thing. A calorie app knows nothing about
-your sleep. A sleep app knows nothing about your hydration. So when someone
-actually feels unwell, nothing connects the dots, and the advice stays generic.
+Everyone already tracks health data. The trouble is that each app tracks
+one thing and then advises you on that one thing. Your calorie app has no
+idea how you slept. Your sleep app has never heard of your water intake.
+So when you actually feel unwell, nothing joins the dots and the advice
+stays vague.
 
-Most everyday complaints — afternoon headaches, low energy, poor concentration —
-are not single-cause problems. They sit at the intersection of sleep, hydration
-and food. Answering them properly needs those domains to talk to each other.
+An afternoon headache is rarely caused by one thing. It usually sits
+somewhere between short sleep, not enough water and a skipped lunch.
+Answering it properly means those three things have to compare notes.
 
-## Solution overview
+## What we built
 
-A team of specialist AI agents that **communicate with each other** to explain
-how a person feels, using their own logged data.
+You talk to one Coach agent. Behind it sit twelve more.
 
-The user talks (by voice or text) to a single **Coach** agent. Behind it sit
-twelve more: eight specialists that each own one domain, and four meta-agents
-that hold no data at all and work entirely by asking the others.
+Eight of them own data. Four hold nothing at all and work purely by
+asking the others.
 
-| Agent | Owns | Kind |
+| Agent | What it owns | Kind |
 |---|---|---|
 | `coach` | Conversation, safety, routing | orchestrator |
 | `hydration` | Water intake | specialist |
 | `nutrition` | Meals and calories | specialist |
-| `sleep` | Sleep hours and debt | specialist |
+| `sleep` | Sleep hours and sleep debt | specialist |
 | `activity` | Steps and exercise minutes | specialist |
-| `vitals` | Weight, BMI, heart rate, blood pressure | specialist |
-| `mood` | Daily wellbeing score and trend | specialist |
-| `medication` | Adherence tracking (never dosing) | specialist |
-| `symptom` | Symptom correlation + RAG | specialist |
-| `insights` | Cross-domain pattern detection | meta |
+| `vitals` | Weight, BMI, blood pressure, heart rate | specialist |
+| `mood` | Daily wellbeing score | specialist |
+| `medication` | Whether it was taken, never the dose | specialist |
+| `symptom` | Correlates a symptom against everything else | specialist |
+| `insights` | Finds patterns across domains | meta |
 | `progress` | Streaks, daily goals, achievements | meta |
-| `assessment` | Energy needs, intake cross-checks, whole-picture review | meta |
-| `report` | Doctor-ready health summary | meta |
+| `assessment` | Energy needs and whether intake matches them | meta |
+| `report` | A summary to hand a clinician | meta |
 
-When the user reports a symptom, the Symptom agent doesn't answer alone: it
-queries every data-holding agent, correlates what comes back, and explains
-the likely contributing factors.
+One rule makes this a real multi-agent system rather than one program
+with twelve functions in it: **no agent reads another agent's data
+directly.** If the symptom agent needs your sleep, it asks the sleep
+agent, and the message bus records the exchange.
 
-**The core scenario:**
-
-```
-User:  "I keep getting a headache in the afternoon."
-
-  coach    -> symptom      (routes the question)
-  symptom  -> hydration    (2 of 8 glasses today, shortfall 6)
-  symptom  -> nutrition    (1 meal, 300 kcal so far)
-  symptom  -> sleep        (7 nights, averaging 5.4h, 18.3h debt)
-  symptom  -> activity     (2400 steps, 35 active minutes this week)
-  symptom  -> vitals       (71.5kg, BMI 23.3, HR 86bpm)
-  symptom  -> mood         (4.0/10 average, trend falling)
-  symptom  -> medication   (Vitamin D pending today)
-
-Coach: "Looking at what you've logged, I can see a sleep debt of about
-        18.3 hours; low fluid intake — 2 of 8 glasses today; a low calorie
-        intake so far; very little movement this week; a low mood score;
-        medication not yet taken today. Those are all common contributors...
-        This is general information, not a diagnosis. If it persists,
-        worsens, or you're worried, please see a doctor."
-```
-
-One question, eight agents, one joined-up answer. **That collaboration is the
-project** — not the tracking.
-
-Three further agents build on the same mechanism. `insights` scans every
-domain for cross-domain patterns. `progress` derives streaks and achievements
-from real logged data. `assessment` estimates daily energy needs from height,
-weight, age and activity, then checks logged intake against them: an intake
-far below requirement is read as incomplete logging rather than starvation,
-which is the kind of judgement a single-domain tracker cannot make.
-
-### What it deliberately does not do
-
-It does **not** diagnose disease or recommend medication. It is a wellness
-coach that shares general information and surfaces patterns in the user's own
-data. Anything that looks urgent is escalated to emergency services
-immediately, before any model call is made. See
-[docs/RESPONSIBLE-AI.md](docs/RESPONSIBLE-AI.md).
-
-## Solution architecture
+### The scenario worth watching
 
 ```
-                          ┌──────────────┐
-          voice / text    │              │  · safety gate (first, always)
-    user ────────────────►│ Coach agent  │  · intent + entity parsing
-                          │              │  · routing and delegation
-                          └──────┬───────┘
-                                 │
-                          ┌──────▼───────┐
-                          │  Agent Bus   │  every agent-to-agent message
-                          │  (+ trace)   │  is recorded here
-                          └──────┬───────┘
-     ┌───────────┬──────────┬────┴─────┬──────────┬───────────┐
-     ▼           ▼          ▼          ▼          ▼           ▼
-┌─────────┐ ┌─────────┐ ┌───────┐ ┌────────┐ ┌────────┐ ┌──────────┐
-│Hydration│ │Nutrition│ │ Sleep │ │Activity│ │ Vitals │ │   Mood   │
-└────┬────┘ └────┬────┘ └───┬───┘ └───┬────┘ └───┬────┘ └────┬─────┘
-     │           │          │         │          │           │
-     │      ┌────────────┐  │    ┌─────────┐     │           │
-     │      │ Medication │  │    │ Symptom │◄────┴───────────┘
-     │      └─────┬──────┘  │    └────┬────┘   asks every peer
-     └────────────┴─────────┴─────────┘
-                            ▼
-                     ┌─────────────┐        ┌──────────┐  ┌────────┐
-                     │   SQLite    │        │ Insights │  │ Report │
-                     └─────────────┘        └──────────┘  └────────┘
-                                             meta-agents: hold no data,
-                                             query every peer instead
+You:   I keep getting a headache in the afternoon.
+
+  coach    -> symptom      routes the question
+  symptom  -> hydration    2 of 8 glasses today
+  symptom  -> nutrition    1 meal, 200 kcal so far
+  symptom  -> sleep        5.7h average, 16.2h of debt
+  symptom  -> activity     4861 steps, 140 active minutes this week
+  symptom  -> vitals       71.5kg, BMI 23.3
+  symptom  -> mood         3.6/10 average, falling
+  symptom  -> medication   Vitamin D still pending
+
+Coach: Looking at what you've logged, I can see a sleep debt of about
+       16 hours, low fluid intake, a low calorie intake so far and a
+       low mood score. Those are all common contributors to how you're
+       feeling. This is general information, not a diagnosis. If it
+       persists or worsens, please see a doctor.
 ```
 
-The Symptom agent never reads another agent's table directly. It asks that
-agent through the bus, and the bus records the exchange. Full detail in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+One question, eight agents, one joined-up answer. That collaboration is
+the project. The tracking is just what makes it possible.
 
-## Technology stack
+### Things it does that a single tracker cannot
 
-| Layer | Choice |
+The `assessment` agent estimates what you need in a day from your height,
+weight, age and activity level, then checks what you actually logged
+against it. If your intake comes out far below your requirement it says
+the day looks part-logged rather than telling you you are starving,
+because someone who forgot to log lunch is far more common than someone
+who genuinely ate 200 calories.
+
+The `nutrition` agent holds a conversation. Say "I ate a burger" and it
+asks which one, because the honest answer is anywhere between 330 and 690
+calories and guessing would make the whole day meaningless. It also reads
+a photo of your meal, though it proposes what it sees and waits for you
+to confirm rather than logging it straight away.
+
+### What it will not do
+
+It does not diagnose anything, and it does not go near medication or
+doses. Ask it to and it refuses. Anything that sounds like an emergency
+is escalated before any other code runs. The reasoning behind all of that
+is in [docs/RESPONSIBLE-AI.md](docs/RESPONSIBLE-AI.md).
+
+## How it fits together
+
+```
+                          +--------------+
+          voice / text    |              |  safety gate, always first
+    you  ---------------->|    Coach     |  intent and entity parsing
+                          |              |  routing and delegation
+                          +------+-------+
+                                 |
+                          +------v-------+
+                          |  Agent Bus   |  every message between agents
+                          |  and trace   |  is recorded here
+                          +------+-------+
+      +----------+---------+-----+-----+---------+----------+
+      v          v         v           v         v          v
+ +---------++---------++-------++--------++--------++----------+
+ |Hydration||Nutrition|| Sleep ||Activity|| Vitals ||   Mood   |
+ +----+----++----+----++---+---++---+----++---+----++----+-----+
+      |          |         |        |         |          |
+      |    +------------+  |   +---------+    |          |
+      |    | Medication |  |   | Symptom |<---+----------+
+      |    +-----+------+  |   +----+----+  asks every peer
+      +----------+---------+--------+
+                           v
+                    +-------------+   +----------+ +----------+ +--------+
+                    |   SQLite    |   | Insights | | Progress | | Report |
+                    +-------------+   +----------+ +----------+ +--------+
+                                       these hold no data and query peers
+```
+
+More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Built with
+
+Python 3.11, FastAPI and Uvicorn. SQLite through the standard library,
+with no ORM. The front end is plain HTML, CSS and JavaScript with no
+build step, which keeps every line readable. Tests are pytest.
+
+### Azure services
+
+| Service | Doing what |
 |---|---|
-| Language | Python 3.11 |
-| API | FastAPI + Uvicorn |
-| Storage | SQLite (stdlib `sqlite3`, no ORM) |
-| Frontend | Plain HTML/CSS/JS, no build step |
-| Tests | pytest |
+| Azure OpenAI, via AI Foundry | Agent reasoning, health answers, meal conversations |
+| Azure OpenAI vision | Reading a meal from a photograph |
+| Azure AI Speech | Speech to text in, text to speech out |
+| Azure AI Content Safety | A third guardrail layer on free text |
+| Azure AI Search | RAG index, wired but not provisioned |
 
-### Azure AI services
+### AI-103 ideas we used
 
-| Service | Used for |
-|---|---|
-| **Azure AI Foundry / Azure OpenAI** | Agent reasoning and response generation |
-| **Azure AI Search** | RAG index over the curated health knowledge base |
-| **Azure AI Speech** | Speech-to-text input and text-to-speech replies |
-| **Azure OpenAI vision** | Reading a meal from a photograph |
-| **Azure AI Content Safety** | Responsible-AI guardrail on user input |
+Multi-agent systems, with thirteen agents that each do one job.
+Cross-agent communication through a bus that records every exchange.
+Orchestration, where the Coach routes and synthesises rather than
+answering. RAG for grounded health information. Tools, in that every
+agent exposes `report()` for its peers to call. Intent recognition that
+runs before any model call. Speech and vision for multimodal input.
+Multi-turn dialogue, where the model decides a meal is too vague to log
+and asks. And responsible AI throughout, which shaped more of the design
+than anything else on this list.
 
-### AI-103 concepts applied
-
-- **Multi-agent systems** — thirteen agents with distinct responsibilities
-- **Cross-agent communication** — a message bus with a full, inspectable trace
-- **Agent orchestration** — the Coach routes, delegates and synthesises
-- **RAG** — grounded answers from a curated knowledge base
-- **Tools** — agents expose `report()` as a callable capability to peers
-- **Intent recognition** — deterministic entity extraction before any model call
-- **Speech / multimodal** — voice in, voice out, and meals read from a photo
-- **Multi-turn dialogue** — the model decides when a meal is too vague to log
-  honestly and asks, rather than guessing
-- **Responsible AI** — safety gate, scope limits, escalation, disclaimers
-
-## Setup instructions
+## Running it
 
 ```bash
-git clone <repo-url>
-cd AI-103
+git clone https://github.com/Jugadveer/Ai-103.git
+cd Ai-103
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 copy .env.example .env
-```
-
-The app runs **without any Azure credentials** — `MOCK_MODE=true` in `.env`
-uses the local knowledge base and rule-based logic. Set `MOCK_MODE=false` and
-fill in the Azure keys to enable the live services.
-
-```bash
+python -m scripts.seed
 uvicorn app.main:app --reload
 ```
 
-Then open <http://127.0.0.1:8000>. Click **Load demo data** to populate a
-week of realistic logs, then ask about a headache.
+Open <http://127.0.0.1:8000>.
 
-### Deploying it
+It runs with no Azure credentials at all. Leave `MOCK_MODE=true` and it
+falls back to local rules and a local knowledge file. Fill in the keys and
+set `MOCK_MODE=false` to bring the live services in.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). In short: the app keeps state
-in SQLite, so a serverless host cannot hold its data. `render.yaml` is
-committed for a deployment with a real disk; `vercel.json` makes a Vercel
-preview work but the app will warn that nothing is saved.
+`python -m scripts.seed` writes a month of history so the charts and
+streaks have something to show. The data is deliberately shaped rather
+than random: sleep declines across the month, mood declines with it, and
+three days are missing so the gaps in the charts are real.
 
-To load the demo dataset from the terminal instead:
+Deploying it is its own subject, covered in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The short version is that this
+app keeps state on disk, so a serverless host cannot hold its data.
 
-```bash
-python -m scripts.seed
-```
-
-## Testing and results
+## Tests
 
 ```bash
 python -m pytest tests/ -q
 ```
 
-**294 tests, all passing.** Full breakdown in [docs/TESTING.md](docs/TESTING.md).
+307 tests, all passing, in about a minute. No Azure needed: the suite runs
+entirely offline.
 
-| Suite | Tests | Covers |
+| Suite | Tests | What it covers |
 |---|---|---|
-| `test_validation.py` | 24 | Plausible-range bounds on every health value |
+| `test_validation.py` | 24 | Plausible ranges for every health value |
 | `test_nlu.py` | 41 | Intent classification and entity extraction |
-| `test_safety.py` | 32 | Emergency escalation, scope refusal, false positives |
-| `test_agents.py` | 30 | Each agent's calculations in isolation |
-| `test_crossagent.py` | 15 | Agent-to-agent communication and the trace |
-| `test_nutrition.py` | 41 | Food recognition, clarification, self-reported vitals |
-| `test_assessment.py` | 35 | Energy estimates, and the limits the review keeps to |
-| `test_progress.py` | 22 | Streaks, achievements, history gaps, install routes |
-| `test_api.py` | 13 | Every HTTP endpoint and input validation |
+| `test_safety.py` | 32 | Escalation, refusal, and not over-blocking |
+| `test_agents.py` | 30 | Each agent's calculations on its own |
+| `test_crossagent.py` | 19 | Agents talking to each other |
+| `test_nutrition.py` | 41 | Food recognition and the meal conversation |
+| `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
+| `test_progress.py` | 28 | Streaks, achievements, the seeded dataset |
+| `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_api.py` | 16 | Every endpoint, plus deployment readiness |
 
-The safety tests are the most important ones in the project: they assert that
-emergencies escalate, that diagnosis is refused, that ordinary messages are
-*not* over-blocked, and that **zero** agent calls happen after a red flag.
+Writing them was worth it. They caught a stroke red flag that missed
+"my face is drooping" because the phrase assumed adjacent words, a
+guardrail that was silently discarding good answers for containing the
+words "you have", and a cascade where one question was making nineteen
+agent calls instead of eight. None of those were visible by reading the
+code. [docs/TESTING.md](docs/TESTING.md) lists the rest.
 
-## Known limitations
+## What it cannot do
 
-Stated plainly, because several of them are the reason features are shaped
-the way they are.
+Worth being plain about, because several of these are the reason features
+are shaped the way they are.
 
-- **The app measures nothing.** There is no wearable and no sensor. Heart
-  rate, blood pressure, steps, weight and mood are all typed in by the user.
-  BMI and energy needs are computed, but only from numbers the user supplied
-- **Mood cannot be sensed**, so it is asked for on a 1-10 scale with worded
-  anchors rather than inferred
-- **Calorie figures are estimates** from typical serving sizes, not weighed
-  measurements, and the interface says so wherever one is shown
-- **Energy needs use Mifflin-St Jeor**, which is routinely out by ten percent
-  and worse at the extremes of body composition
-- Single-user; no authentication or multi-user accounts
-- Knowledge base is small and must be replaced with properly cited sources
-- Keyword-first intent routing, with the model only as fallback
-- No wearable or device integration — all data is self-reported
-- Not validated by any medical professional
+The app measures nothing. There is no wearable and no sensor anywhere in
+it. Heart rate, blood pressure, steps, weight and mood are all typed in
+by you. BMI and energy needs are calculated, but only from numbers you
+supplied.
 
-## Future improvements
+Mood in particular cannot be sensed, so we ask for it on a scale with
+worded anchors instead of pretending to infer it.
 
-- Cited, clinician-reviewed knowledge base
-- Wearable integration for automatic sleep and activity data
-- Multi-user accounts with encrypted health records
-- Longitudinal trend detection across weeks rather than days
-- Regional language support via Azure AI Translator
+Calorie figures are estimates from typical serving sizes, not weighed
+measurements, and the interface says so every time it shows one. Energy
+needs come from the Mifflin-St Jeor equation, which is routinely out by
+about ten percent and worse at the extremes of body composition.
+
+It is single user, with no accounts. The knowledge file is small and
+needs proper clinical sourcing. A web app also cannot listen for a wake
+word in the background, so voice still starts on a tap.
+
+## Where we would take it next
+
+Wearable integration so activity stops being self-reported. A knowledge
+base reviewed by an actual clinician. Multi-user accounts with encrypted
+records. Trend detection across months rather than days. Regional
+language support through Azure AI Translator.
 
 ## Acknowledgements
 
-
-- Azure AI services documentation — Microsoft
-- FastAPI, Uvicorn, Pydantic, pytest — open-source libraries
-- Health knowledge base content — _replace placeholders with cited sources_
-- Calorie reference figures — public nutrition labels and standard portion
-  tables. Approximate typical servings, labelled as estimates throughout
-- Resting metabolic rate — the Mifflin-St Jeor equation, a published
-  standard. Used as an estimate with a stated margin, never as a measurement
-- **AI-assisted development tools** were used during implementation, to help
-  work through code and debugging. All code in this repository is understood
-  by the team, and every part of it can be explained on request.
+- Azure AI services documentation, Microsoft
+- FastAPI, Uvicorn, Pydantic and pytest, all open source
+- Calorie reference figures from public nutrition labels and standard
+  portion tables. Approximate typical servings, labelled as estimates
+  throughout
+- Resting metabolic rate from the Mifflin-St Jeor equation, a published
+  standard, used as an estimate with a stated margin and never as a
+  measurement
+- Health knowledge base content still needs replacing with cited sources
+- **AI-assisted development tools** were used during implementation, to
+  help work through code and debugging. All code in this repository is
+  understood by the team, and every part of it can be explained on
+  request.
 
 ---
 
-**Disclaimer:** This is a student project for a university course. It is not a
-medical device and must not be used for medical decisions.
+This is a student project. It is not a medical device and must not be
+used for medical decisions.

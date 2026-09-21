@@ -4,7 +4,7 @@
 python -m pytest tests/ -q
 ```
 
-**294 tests, all passing, in about 5 seconds.** No Azure credentials needed —
+**307 tests, all passing, in about a minute.** No Azure credentials needed,
 the suite runs entirely in `MOCK_MODE` against a throwaway SQLite file.
 
 Testing, reliability and responsible AI carry 15% of the project grade, and
@@ -15,13 +15,15 @@ the safety tests below are the ones to demonstrate if asked.
 | Suite | Tests | Focus |
 |---|---|---|
 | `test_validation.py` | 24 | Plausible ranges for every health value |
-| `test_nutrition.py` | 41 | Food recognition, clarification, self-reported vitals |
-| `test_progress.py` | 22 | Streaks, achievements, history gaps, installable routes |
 | `test_nlu.py` | 41 | Intent classification and entity extraction |
-| `test_safety.py` | 32 | Emergency escalation and scope refusal |
-| `test_agents.py` | 30 | Each agent's calculations in isolation |
-| `test_crossagent.py` | 15 | Agent-to-agent communication |
-| `test_api.py` | 11 | HTTP endpoints and boundary validation |
+| `test_safety.py` | 32 | Escalation, refusal, and not over-blocking |
+| `test_agents.py` | 30 | Each agent's calculations on its own |
+| `test_crossagent.py` | 19 | Agents talking to each other, and the trace |
+| `test_nutrition.py` | 41 | Food recognition and the meal conversation |
+| `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
+| `test_progress.py` | 28 | Streaks, achievements, the seeded dataset |
+| `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_api.py` | 16 | Every endpoint, plus deployment readiness |
 
 ## The tests that matter most
 
@@ -34,7 +36,7 @@ exams") and asserts none are refused. An over-cautious health app is a useless
 one, so both directions are tested.
 
 **Nothing runs after a red flag.** `test_emergency_short_circuits_before_any_peer_call`
-asserts `bus.trace == []` after "chest pain and cannot breathe" — proving the
+asserts `bus.trace == []` after "chest pain and cannot breathe", proving the
 guardrail runs before routing, before peers, before any model call.
 
 **Cross-agent communication actually happens.**
@@ -43,7 +45,7 @@ appear in the trace after a single symptom question.
 
 **The system extends without editing existing agents.**
 `test_adding_an_agent_extends_correlation_automatically` registers a brand-new
-agent at runtime and asserts the Symptom agent starts querying it — with no
+agent at runtime and asserts the Symptom agent starts querying it, with no
 change to the Symptom agent. That is the payoff of routing through the bus.
 
 ## Bugs these tests caught during development
@@ -64,7 +66,7 @@ question to be asked in the viva.
 | The doctor summary printed empty sections for domains with no data | `test_report_declines_when_data_is_thin` | Sections are gated on `has_data` |
 
 The two safety misses are the important ones. Both were false negatives on
-stroke and anaphylaxis presentations — exactly the failure mode that matters
+stroke and anaphylaxis presentations, which is exactly the failure mode that matters
 in a health app, and neither was visible by reading the code.
 
 ## Manual verification
@@ -79,6 +81,6 @@ symptom question and 9 for the report.
 Stated plainly rather than hidden:
 
 - No tests against live Azure services (everything runs in `MOCK_MODE`)
-- No load or concurrency testing — the app is single-user by design
+- No load or concurrency testing, since the app is single-user by design
 - No browser automation; UI checks were manual
 - The knowledge base content itself is unverified placeholder text
