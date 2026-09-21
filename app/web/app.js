@@ -1105,6 +1105,20 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => { /* offline shell is optional */ });
 }
 
+async function warnIfSessionsAreUnstable() {
+  // A signed-out-immediately loop is one of the least obvious things to
+  // debug from the outside, so the screen where it happens says why.
+  try {
+    const h = await api.get('/api/health');
+    if (h.sessions !== 'per_process') return;
+    const note = document.createElement('div');
+    note.className = 'gate-errors';
+    note.textContent = 'This host has no SECRET_KEY set, so signing in may '
+      + 'not stick. Set one in the environment.';
+    $('auth-form').prepend(note);
+  } catch (e) { /* the form still works, or nothing does */ }
+}
+
 function showEphemeralNotice() {
   if (document.getElementById('ephemeral')) return;
   const bar = document.createElement('div');
@@ -1244,6 +1258,7 @@ async function boot() {
   } catch (e) { /* offline: the sign-in screen is the honest fallback */ }
   showGate();
   $('auth-email').focus();
+  warnIfSessionsAreUnstable();
 }
 
 boot();

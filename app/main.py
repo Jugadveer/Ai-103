@@ -143,6 +143,10 @@ def health():
         "storage": "persistent" if config.STORAGE_PERSISTENT else "ephemeral",
         "backend": config.STORAGE_BACKEND,
         "accounts": users.count(),
+        # Without a configured SECRET_KEY each process signs with its own,
+        # so on a host running more than one, signing in appears to fail
+        # at random. Worth surfacing rather than leaving to be debugged.
+        "sessions": "stable" if config.SECRET_KEY else "per_process",
         "azure": {
             "openai": bool(config.AZURE_OPENAI_API_KEY),
             "search": bool(config.AZURE_SEARCH_API_KEY),
