@@ -29,6 +29,14 @@ class BaseAgent:
     name: str = "base"
     description: str = ""
 
+    # Whether this agent owns a domain of its own data. Meta-agents set
+    # this False: they hold nothing and work by asking the others, so
+    # asking THEM for data is pointless and, worse, makes them broadcast
+    # in turn. The bus reads this to decide who a broadcast reaches, which
+    # is why it is declared here rather than kept as a list of names that
+    # someone has to remember to update.
+    holds_data: bool = True
+
     def __init__(self, bus=None):
         # The bus is how this agent reaches its peers.
         self.bus = bus

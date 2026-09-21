@@ -24,7 +24,6 @@ from app.core.errors import ValidationError
 from app.core.validation import check_number
 from app.store import db
 
-NON_DATA_AGENTS = ("coach", "insights", "report", "progress", "assessment")
 
 # Asked in this order, one at a time. Each entry is the profile key, the
 # question, and how to read the answer.
@@ -45,6 +44,7 @@ class AssessmentAgent(BaseAgent):
         "checks logged intake against them, and flags what stands out. "
         "Never diagnoses and never advises on medication."
     )
+    holds_data = False
 
     # ---------------- entry ----------------
 
@@ -91,8 +91,7 @@ class AssessmentAgent(BaseAgent):
     # ---------------- the review ----------------
 
     def _review(self) -> AgentReply:
-        peers = self.bus.broadcast(self.name, reason="whole-picture review",
-                                   exclude=NON_DATA_AGENTS) if self.bus else {}
+        peers = self.bus.broadcast(self.name, reason="whole-picture review") if self.bus else {}
         profile = db.get_profile()
         vitals = peers.get("vitals", {})
         food = peers.get("nutrition", {})

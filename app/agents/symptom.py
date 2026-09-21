@@ -17,8 +17,6 @@ from app.services import health_ai
 from app.services.search import lookup
 from app.store import db
 
-# Agents that hold no data of their own - asking them would add noise.
-NON_DATA_AGENTS = ("coach", "insights", "report", "symptom")
 
 
 class SymptomAgent(BaseAgent):
@@ -42,8 +40,7 @@ class SymptomAgent(BaseAgent):
         db.add_symptom(query)
 
         # 2. Cross-agent communication: gather context from every peer.
-        peers = self.bus.broadcast(self.name, reason=f"context for: {query}",
-                                   exclude=NON_DATA_AGENTS) if self.bus else {}
+        peers = self.bus.broadcast(self.name, reason=f"context for: {query}") if self.bus else {}
 
         # 3. General health information about what they described.
         #    The local file is a fallback, not a ceiling: it holds six

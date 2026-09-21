@@ -141,3 +141,39 @@ def test_no_agent_ever_queries_a_meta_agent_for_data(seeded_bus):
         bad = [f"{e['from']}->{e['to']}" for e in seeded_bus.trace
                if e["from"] != "coach" and e["to"] in meta]
         assert not bad, f"{message!r} produced meta-agent calls: {bad}"
+
+
+def test_a_broadcast_reaches_only_data_holding_agents(bus):
+    """
+    Regression: the exclusion list was copied into five files and three
+    went stale when new meta-agents were added. The symptom agent then
+    broadcast to progress and assessment, which broadcast in turn, and
+    one question produced nineteen calls instead of eight.
+    """
+    bus.reset_trace()
+    bus.get("symptom").handle("I have a headache")
+    reached = {e["to"] for e in bus.trace}
+    for meta in ("coach", "progress", "assessment", "insights", "report"):
+        assert meta not in reached, f"symptom broadcast to {meta}"
+
+
+def test_the_headline_scenario_stays_at_eight_hops(seeded_bus):
+    """The number quoted in the video script. It must not drift."""
+    seeded_bus.reset_trace()
+    seeded_bus.get("coach").handle("I keep getting a headache in the afternoon")
+    assert len(seeded_bus.trace) == 8, \
+        [f"{e['from']}->{e['to']}" for e in seeded_bus.trace]
+
+
+def test_every_agent_declares_whether_it_holds_data(bus):
+    holders = {n for n, a in bus.agents.items() if a.holds_data}
+    assert holders == {"hydration", "nutrition", "sleep", "activity",
+                       "vitals", "mood", "medication", "symptom"}
+
+
+def test_a_meta_agent_does_not_cascade(seeded_bus):
+    """insights asks the specialists, and none of them asks anyone back."""
+    seeded_bus.reset_trace()
+    seeded_bus.get("insights").handle("patterns")
+    senders = {e["from"] for e in seeded_bus.trace}
+    assert senders == {"insights"}

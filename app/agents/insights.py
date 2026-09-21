@@ -13,8 +13,6 @@ from app.agents.base import BaseAgent, AgentReply
 from app.store import db
 
 
-# Agents that hold no data of their own.
-NON_DATA_AGENTS = ("coach", "insights", "report")
 
 
 class InsightsAgent(BaseAgent):
@@ -23,6 +21,7 @@ class InsightsAgent(BaseAgent):
         "Correlates data across every other agent to surface patterns, "
         "each with the evidence behind it."
     )
+    holds_data = False
 
     def handle(self, query: str) -> AgentReply:
         # A question about the subject deserves an answer, not this
@@ -35,7 +34,7 @@ class InsightsAgent(BaseAgent):
 
         peers = self.bus.broadcast(
             self.name, reason="correlation scan",
-            exclude=NON_DATA_AGENTS) if self.bus else {}
+        ) if self.bus else {}
         found = self.find_patterns(peers)
 
         if not found:

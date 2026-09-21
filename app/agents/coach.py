@@ -104,6 +104,7 @@ LOG_ACTIONS = {
 class CoachAgent(BaseAgent):
     name = "coach"
     description = "Orchestrator. Talks to the user and delegates to specialists."
+    holds_data = False
 
     def handle(self, query: str) -> AgentReply:
         low = (query or "").lower().strip()

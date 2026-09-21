@@ -12,8 +12,6 @@ from datetime import date
 from app.agents.base import BaseAgent, AgentReply
 from app.store import db
 
-# Agents that hold no data of their own.
-NON_DATA_AGENTS = ("coach", "insights", "report", "progress", "assessment")
 
 
 class ReportAgent(BaseAgent):
@@ -22,6 +20,7 @@ class ReportAgent(BaseAgent):
         "Compiles a factual health summary from every agent, formatted for "
         "the user to share with a clinician."
     )
+    holds_data = False
 
     def handle(self, query: str) -> AgentReply:
         # A question about the subject deserves an answer, not this
@@ -34,7 +33,7 @@ class ReportAgent(BaseAgent):
 
         peers = self.bus.broadcast(
             self.name, reason="compiling health summary",
-            exclude=NON_DATA_AGENTS) if self.bus else {}
+        ) if self.bus else {}
         text = self.build(peers)
         return AgentReply(agent=self.name, text=text,
                           data={"report": text, "peers": peers})

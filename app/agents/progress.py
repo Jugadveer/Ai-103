@@ -9,7 +9,6 @@ to the user is decorative.
 from app.agents.base import BaseAgent, AgentReply
 from app.store import db
 
-NON_DATA_AGENTS = ("coach", "insights", "report", "progress")
 
 # Five daily goals. Hitting one is a "ring closed".
 GOALS = [
@@ -74,6 +73,7 @@ class ProgressAgent(BaseAgent):
         "Tracks daily goals, logging streaks and achievements, all derived "
         "from real logged data."
     )
+    holds_data = False
 
     def handle(self, query: str) -> AgentReply:
         # A question about the subject deserves an answer, not this
@@ -110,8 +110,7 @@ class ProgressAgent(BaseAgent):
     def _peers(self) -> dict:
         if not self.bus:
             return {}
-        return self.bus.broadcast(self.name, reason="progress scan",
-                                  exclude=NON_DATA_AGENTS)
+        return self.bus.broadcast(self.name, reason="progress scan")
 
     def report(self) -> dict:
         peers = self._peers()

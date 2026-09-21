@@ -34,16 +34,27 @@ class AgentBus:
         return data
 
     def broadcast(self, sender: str, reason: str,
-                  exclude: tuple = ("coach",)) -> dict:
-        """Ask every other specialist agent for its report at once.
-
-        The orchestrator is excluded by default - it holds no domain data,
-        so asking it would only add noise to the trace.
+                  exclude: tuple | None = None) -> dict:
         """
+        Ask every data-holding agent for its report at once.
+
+        Who that is comes from each agent's own holds_data flag, not from
+        a list kept here. Five copies of such a list existed once and
+        three had gone stale, so the symptom agent was broadcasting to
+        the meta-agents, which broadcast in turn: one question produced
+        nineteen calls instead of eight.
+
+        Pass exclude to override, which the check-in does to reach
+        everything.
+        """
+        if exclude is None:
+            audience = [n for n, a in self.agents.items() if a.holds_data]
+        else:
+            audience = [n for n in self.agents if n not in exclude]
         return {
             name: self.request(sender, name, reason)
-            for name in self.agents
-            if name != sender and name not in exclude
+            for name in audience
+            if name != sender
         }
 
     def _log(self, sender, receiver, reason, data) -> None:
