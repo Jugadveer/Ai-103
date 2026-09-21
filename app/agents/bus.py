@@ -33,6 +33,24 @@ class AgentBus:
         self._log(sender, receiver, reason, data)
         return data
 
+    def handoff(self, sender: str, receiver: str, reason: str) -> None:
+        """
+        Record that a message was passed to another agent.
+
+        Distinct from request(), which fetches the peer's report. Routing
+        a user's message is not a request for data: the coach hands the
+        question over and the specialist answers it. Using request() for
+        that pulled a report nobody read, and for an agent whose report is
+        built by polling its peers that was eight calls to produce a value
+        that was then thrown away and recomputed. One question about a
+        streak made seventeen agent calls; eight of them existed only
+        because the handoff was spelled as a request.
+        """
+        if receiver not in self.agents:
+            self._log(sender, receiver, reason, {"error": "no such agent"})
+            return
+        self._log(sender, receiver, reason, {"handoff": True})
+
     def broadcast(self, sender: str, reason: str,
                   exclude: tuple | None = None) -> dict:
         """

@@ -229,3 +229,60 @@ def test_the_referral_prompt_forbids_naming_anything():
     assert "Never mention medication" in prompt
     assert "probably nothing" in prompt      # nor false reassurance
     assert "How soon" in prompt              # urgency is half the value
+
+
+# --- the trace is the demonstration, so its numbers are load bearing ------
+
+@pytest.mark.parametrize("message,hops,why", [
+    ("I have been feeling dizzy", 8,
+     "coach hands off, symptom asks the 7 data peers that are not itself"),
+    ("show me the patterns", 9,
+     "insights holds nothing, so it asks all 8 data agents"),
+    ("make a summary for my doctor", 9, "same shape as insights"),
+    ("what is my streak", 9, "progress holds nothing either"),
+    ("how much water have I had", 1, "hydration answers from its own table"),
+    ("I drank 3 glasses of water", 0, "parsed and written, nobody is asked"),
+])
+def test_one_question_costs_a_known_number_of_calls(seeded_bus, message,
+                                                    hops, why):
+    """
+    The trace is the thing this project demonstrates, so a wrong number
+    in it is a wrong claim, not a performance detail.
+
+    "What is my streak" made seventeen calls. The coach routed with
+    bus.request, which fetches the target's report as well as recording
+    the edge; for an agent whose report is built by polling its peers
+    that was eight calls, discarded, then made again by the agent itself.
+    """
+    seeded_bus.reset_trace()
+    seeded_bus.get("coach").safe_handle(message)
+    actual = len(seeded_bus.trace)
+    assert actual == hops, (
+        f"{message!r} made {actual} calls, expected {hops} ({why})\n  "
+        + "\n  ".join(f"{t['from']} -> {t['to']}" for t in seeded_bus.trace))
+
+
+def test_a_handoff_does_not_pull_the_targets_report(seeded_bus):
+    """The distinction the fix rests on."""
+    calls = []
+    progress = seeded_bus.get("progress")
+    original = progress.safe_report
+    progress.safe_report = lambda *a, **k: (calls.append(1), original())[1]
+
+    seeded_bus.reset_trace()
+    seeded_bus.handoff("coach", "progress", reason="routing")
+    assert calls == [], "handoff fetched a report it was never going to read"
+    assert len(seeded_bus.trace) == 1
+    assert seeded_bus.trace[0]["to"] == "progress"
+
+
+def test_request_still_does_pull_the_report(seeded_bus):
+    """Peer to peer is unchanged: that one really is asking for data."""
+    facts = seeded_bus.request("symptom", "hydration", reason="correlating")
+    assert "glasses_today" in facts
+
+
+def test_a_handoff_to_a_missing_agent_is_recorded_not_crashed(seeded_bus):
+    seeded_bus.reset_trace()
+    seeded_bus.handoff("coach", "nonexistent", reason="typo")
+    assert len(seeded_bus.trace) == 1

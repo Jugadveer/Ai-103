@@ -134,7 +134,7 @@ class CoachAgent(BaseAgent):
             owner = self.bus.get(pending.agent)
             if owner is not None and hasattr(owner, "continue_dialog"):
                 pending.turns += 1
-                self.bus.request(self.name, pending.agent,
+                self.bus.handoff(self.name, pending.agent,
                                  reason=f"answer to: {pending.question[:60]}")
                 answered = owner.continue_dialog(query, pending.context)
                 # None means the agent judged this a change of subject, so
@@ -273,7 +273,7 @@ class CoachAgent(BaseAgent):
                 text="I can help with sleep, water, meals, activity, mood, "
                      "vitals or how you're feeling. Which one?",
             )
-        self.bus.request(self.name, target, reason=f"user asked: {query}")
+        self.bus.handoff(self.name, target, reason=f"user asked: {query}")
         return specialist.safe_handle(query)
 
     def _route(self, low: str) -> str:
