@@ -68,6 +68,22 @@ class BaseAgent:
             log.error("report_failed", agent=self.name, error=str(exc)[:200])
             return {"error": True, "status": "unavailable"}
 
+    # --- answering questions --------------------------------------------
+
+    def try_answer(self, query: str, context: dict | None = None) -> str:
+        """
+        Answer a question in this agent's domain, grounded in real data.
+
+        Returns '' when the question is not a question, when the model is
+        unavailable, or when the answer crossed a guardrail. The caller
+        then falls back to reporting what it holds.
+        """
+        from app.services import health_ai
+        if not health_ai.looks_like_a_question(query):
+            return ""
+        return health_ai.answer(query, context or {self.name: self.safe_report()},
+                                domain=self.name)
+
     # --- peer access ----------------------------------------------------
 
     def ask_peer(self, peer_name: str, reason: str) -> dict:

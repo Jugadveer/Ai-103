@@ -10,6 +10,8 @@ Pipeline for every message:
 The language model is only consulted when the deterministic parser has low
 confidence, which keeps the common path free, instant and repeatable.
 """
+import re
+
 from app.agents.base import BaseAgent, AgentReply
 from app.core import logging as log
 from app.core import nlu
@@ -41,6 +43,34 @@ ROUTES = {
     "symptom": ["headache", "pain", "ache", "dizzy", "nausea", "fever", "sick",
                 "symptom", "unwell", "hurts", "cramp", "sore", "cough"],
 }
+
+# Complaints are recognised by sentence shape, not by a list of
+# conditions. "I keep getting acidity after meals" is a complaint
+# whatever the ailment is called, and no list of symptoms I write will
+# ever cover every way of describing one. Used only offline; when the
+# model is available it routes instead.
+COMPLAINT_SHAPES = [re.compile(p) for p in (
+    r"\bi (?:keep|kept) (?:getting|having|feeling)\b",
+    r"\bmy \w+ (?:hurts|aches|is sore|feels|is killing)\b",
+    r"\bi (?:feel|felt|am feeling) \w+",
+    r"\b(?:pain|ache|aching|soreness) (?:in|around|near)\b",
+    r"\bit (?:hurts|aches)\b",
+    r"\bnot feeling (?:well|great|good)\b",
+)]
+
+ROUTER_PROMPT = "\n".join([
+    "Route a health app message to ONE agent. Reply with the agent name "
+    "alone, nothing else.",
+    "hydration - drinking water, thirst",
+    "nutrition - food eaten, meals, calories, diet questions",
+    "sleep - sleeping, tiredness, rest",
+    "activity - exercise, steps, movement",
+    "vitals - weight, height, BMI, blood pressure, heart rate",
+    "mood - feelings, stress, wellbeing",
+    "medication - pills and whether they were taken",
+    "symptom - any physical complaint, pain, discomfort or illness, "
+    "including ones that mention food or meals",
+])
 
 HELP_TEXT = (
     "I coordinate a team of agents for you. You can:\n"
@@ -105,7 +135,12 @@ class CoachAgent(BaseAgent):
                 pending.turns += 1
                 self.bus.request(self.name, pending.agent,
                                  reason=f"answer to: {pending.question[:60]}")
-                return owner.continue_dialog(query, pending.context)
+                answered = owner.continue_dialog(query, pending.context)
+                # None means the agent judged this a change of subject, so
+                # the message is routed fresh rather than forced into it.
+                if answered is not None:
+                    return answered
+                self.bus.clear_followup()
             self.bus.clear_followup()
 
         # 3. Deterministic intent parsing.
@@ -239,10 +274,29 @@ class CoachAgent(BaseAgent):
         return specialist.safe_handle(query)
 
     def _route(self, low: str) -> str:
-        """Weighted keyword scoring, with the model only as a tiebreak."""
-        # A message naming actual foods is a meal, whatever words surround
-        # it. "I had a big mac and large fries" contains no nutrition
-        # keyword at all and was previously routed to the symptom agent.
+        """
+        Pick the specialist. The model decides when it is available,
+        because a keyword table only knows the words somebody thought to
+        write down: "I keep getting acidity after meals" is a symptom, and
+        the word "meals" sent it to the nutrition agent.
+
+        Keyword scoring remains as the offline fallback.
+        """
+        if llm.available():
+            choice = llm.chat(
+                system=ROUTER_PROMPT,
+                user=low,
+            ).strip().lower()
+            if choice in ROUTES:
+                log.info("llm_routed", target=choice)
+                return choice
+
+        # Offline. A complaint outranks everything else: "acidity after
+        # meals" contains the word "meals" and is not about food.
+        if any(shape.search(low) for shape in COMPLAINT_SHAPES):
+            return "symptom"
+
+        # A message naming actual foods is a meal, whatever surrounds it.
         from app.core import foods
         if foods.find(low):
             return "nutrition"

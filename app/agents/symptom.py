@@ -13,6 +13,7 @@ user's own logged data and says when to see a doctor.
 from app.agents.base import BaseAgent, AgentReply
 from app.core import logging as log
 from app.services import safety
+from app.services import health_ai
 from app.services.search import lookup
 from app.store import db
 
@@ -44,7 +45,10 @@ class SymptomAgent(BaseAgent):
         peers = self.bus.broadcast(self.name, reason=f"context for: {query}",
                                    exclude=NON_DATA_AGENTS) if self.bus else {}
 
-        # 3. RAG over the curated health knowledge base.
+        # 3. General health information about what they described.
+        #    The local file is a fallback, not a ceiling: it holds six
+        #    entries, so anything outside them used to return statistics
+        #    at someone who had asked a question.
         kb = lookup(query)
 
         # 4. Correlate what the peers reported with the symptom.
@@ -53,7 +57,7 @@ class SymptomAgent(BaseAgent):
 
         return AgentReply(
             agent=self.name,
-            text=self._compose(factors, kb),
+            text=self._compose(query, factors, kb, peers),
             data={"factors": factors, "peers": peers, "sources": kb},
         )
 
@@ -102,7 +106,8 @@ class SymptomAgent(BaseAgent):
 
         return found
 
-    def _compose(self, factors: list[str], kb: list[dict]) -> str:
+    def _compose(self, query: str, factors: list[str], kb: list[dict],
+                 peers: dict) -> str:
         parts = []
         if factors:
             parts.append(
@@ -113,7 +118,13 @@ class SymptomAgent(BaseAgent):
                 "Your logged data all looks reasonable, so nothing there stands "
                 "out as an obvious contributor.")
 
-        if kb:
+        # General information about the symptom itself. The model handles
+        # anything, grounded in this person's own numbers; the local file
+        # only covers six topics and takes over when we are offline.
+        spoken = health_ai.answer(query, peers, domain="symptoms")
+        if spoken:
+            parts.append(spoken)
+        elif kb:
             parts.append(kb[0]["content"])
 
         parts.append(

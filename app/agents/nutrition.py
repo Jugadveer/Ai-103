@@ -59,6 +59,14 @@ class NutritionAgent(BaseAgent):
         if self._is_summary_request(query):
             return self._summary()
 
+        # "how much protein do I need" is a question, not a meal. Without
+        # this it was parsed as food, logged nothing, and read as the app
+        # ignoring what was asked.
+        spoken = self.try_answer(query)
+        if spoken:
+            return AgentReply(agent=self.name, text=spoken,
+                              data={**self.report(), "answered": True})
+
         # Anything else routed here is treated as a meal. If the model finds
         # no food in it, nothing is logged and it says so.
         return self._resolve([query])
@@ -73,6 +81,13 @@ class NutritionAgent(BaseAgent):
         # A photo proposal is a yes or no, not another round of resolution.
         if context.get("from_photo"):
             return self._photo_answer(query, context)
+
+        # An open question must not swallow a change of subject. Answering
+        # "what did you eat?" with "my knee hurts when I run" is not an
+        # answer, and treating it as one made the app look deaf.
+        if self._changes_the_subject(query):
+            self._close()
+            return None
 
         turns = list(context.get("turns", [])) + [query]
 
@@ -181,6 +196,23 @@ class NutritionAgent(BaseAgent):
                   f"putting you at {day['calories_today']} for the day.{note}"),
             data={"logged": True, "items": items, "kcal": total,
                   "estimated": True})
+
+    def _changes_the_subject(self, query: str) -> bool:
+        """
+        True when a reply cannot plausibly be answering a food question.
+
+        Judged by what is absent rather than by a list of other topics:
+        no recognisable food, no number, and none of the words that close
+        or confirm an exchange.
+        """
+        if foods.find(query):
+            return False
+        if re.search(r"\d", query or ""):
+            return False
+        if (dialog.is_negative(query) or dialog.is_affirmative(query)
+                or dialog.is_cancel(query)):
+            return False
+        return len((query or "").split()) >= 3
 
     def _close(self) -> None:
         if self.bus:

@@ -31,6 +31,14 @@ class MoodAgent(BaseAgent):
     )
 
     def handle(self, query: str) -> AgentReply:
+        # A question deserves an answer, not a statistics dump. Asking
+        # "what is a good sleep routine" and being told last week's
+        # average was the least useful thing this app did.
+        spoken = self.try_answer(query)
+        if spoken:
+            return AgentReply(agent=self.name, text=spoken,
+                              data={**self.safe_report(), "answered": True})
+
         f = self.report()
         if f["days_logged"] == 0:
             return AgentReply(
