@@ -160,6 +160,13 @@ def _postgres_pool():
                 from psycopg.rows import dict_row
                 _pool = ConnectionPool(
                     config.DATABASE_URL, min_size=1, max_size=5,
+                    # Free Postgres allows few connections and the free
+                    # web service is one small instance, so five is
+                    # plenty. Wait ten seconds for one, not the default
+                    # thirty: a database that is actually down should
+                    # show up as an error while someone is still looking
+                    # at the screen.
+                    timeout=10,
                     kwargs={"row_factory": dict_row}, open=True)
     return _pool
 

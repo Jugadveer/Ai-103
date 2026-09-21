@@ -134,15 +134,28 @@ def service_worker():
 
 @app.get("/api/health")
 def health():
+    """
+    Render points its health check here, and a failing health check fails
+    the deploy. So a database that is unreachable has to be reported as a
+    fact about the database, not raised as a 500 that says only that the
+    deploy did not work. Reading "database": "unreachable: ..." is the
+    difference between a five minute fix and an evening.
+    """
+    try:
+        accounts, database = users.count(), "ok"
+    except Exception as exc:
+        accounts, database = None, f"unreachable: {type(exc).__name__}"
+
     return {
         "status": "ok",
+        "database": database,
         "mock_mode": config.MOCK_MODE,
         "agents": list(bus.agents),
         # Honest about the host. A file-backed database on a serverless
         # platform is thrown away between requests; Postgres is not.
         "storage": "persistent" if config.STORAGE_PERSISTENT else "ephemeral",
         "backend": config.STORAGE_BACKEND,
-        "accounts": users.count(),
+        "accounts": accounts,
         # Without a configured SECRET_KEY each process signs with its own,
         # so on a host running more than one, signing in appears to fail
         # at random. Worth surfacing rather than leaving to be debugged.

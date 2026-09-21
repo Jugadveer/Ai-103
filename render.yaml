@@ -15,12 +15,28 @@
 #
 # SQLite is still the default with no DATABASE_URL set, which is what you
 # want when running locally.
+#
+# Two things about the free plan worth knowing before the demo:
+#
+#   A free Postgres expires 30 days after it is created, and only one can
+#   be active per workspace. Created today that is fine through the
+#   presentation, but check the dashboard before relying on it later.
+#
+#   A free web service sleeps after about fifteen minutes of no traffic
+#   and takes roughly a minute to wake. The data is unaffected: it lives
+#   in the database, not in the container.
 
 databases:
   - name: health-coach-db
     databaseName: health_coach
     user: health_coach
     plan: free
+    postgresMajorVersion: "16"
+
+# No region is set on either the database or the service. Render then puts
+# both in its default, which is the point: they have to match, because the
+# service reaches the database over Render's internal network. If you move
+# one to Singapore for the latency, move both in the same commit.
 
 services:
   - type: web
