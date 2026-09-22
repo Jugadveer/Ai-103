@@ -60,10 +60,21 @@ class MoodAgent(BaseAgent):
         return AgentReply(agent=self.name, text=text, data=f)
 
     def report(self) -> dict:
+        # A month, so the series published below is long enough to show a
+        # trend. The average and the trend still use the last fourteen
+        # entries, which is what every message about mood quotes.
         rows = db.query(
             "SELECT score, day FROM mood WHERE user_id = ? "
-            "ORDER BY id DESC LIMIT 14", (db.current_user(),))
-        scores = [r["score"] for r in rows]
+            "ORDER BY id DESC LIMIT 30", (db.current_user(),))
+
+        # Rows arrive newest first, so the first sighting of a day is the
+        # most recent entry for it. Someone who records their mood twice
+        # gets the later one.
+        by_day: dict[str, float] = {}
+        for r in rows:
+            by_day.setdefault(r["day"], r["score"])
+
+        scores = [r["score"] for r in rows[:14]]
         n = len(scores)
         avg = round(sum(scores) / n, 1) if n else 0.0
 
@@ -78,6 +89,7 @@ class MoodAgent(BaseAgent):
 
         today_score = scores[0] if n else None
         return {
+            "by_day": by_day,
             "has_data": n > 0,
             "self_reported": True,     # mood cannot be measured, only asked
             "scale": SCALE,

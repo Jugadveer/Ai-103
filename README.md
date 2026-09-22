@@ -225,22 +225,25 @@ find out.
 python -m pytest tests/ -q
 ```
 
-337 tests, all passing, in about a minute. No Azure needed: the suite runs
-entirely offline, against a throwaway SQLite file.
+434 tests, all passing, in about two minutes. No Azure needed: the
+suite runs entirely offline, against a throwaway SQLite file.
 
 | Suite | Tests | What it covers |
 |---|---|---|
-| `test_validation.py` | 24 | Plausible ranges for every health value |
+| `test_triage.py` | 66 | The safety layer that generalises, and its limits |
+| `test_nutrition.py` | 41 | Food recognition and the meal conversation |
 | `test_nlu.py` | 41 | Intent classification and entity extraction |
+| `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
+| `test_progress.py` | 34 | Streaks, achievements, the seeded dataset |
 | `test_safety.py` | 32 | Escalation, refusal, and not over-blocking |
 | `test_agents.py` | 30 | Each agent's calculations on its own |
-| `test_crossagent.py` | 19 | Agents talking to each other |
-| `test_nutrition.py` | 41 | Food recognition and the meal conversation |
-| `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
-| `test_progress.py` | 28 | Streaks, achievements, the seeded dataset |
-| `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_validation.py` | 24 | Plausible ranges for every health value |
 | `test_auth.py` | 24 | Sign up, sign in, sessions, and the gate |
+| `test_crossagent.py` | 19 | Agents talking to each other, and the trace |
 | `test_api.py` | 16 | Every endpoint, plus deployment readiness |
+| `test_live_model.py` | 14 | The paths that only run when Azure is configured |
+| `test_postgres.py` | 11 | That the same SQL is legal on both backends |
 | `test_isolation.py` | 6 | That one account cannot see another's data |
 
 Writing them was worth it. They caught a stroke red flag that missed

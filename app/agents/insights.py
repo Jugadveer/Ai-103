@@ -15,6 +15,45 @@ from app.store import db
 
 
 
+# How much agreement counts as "moving together", and how many days it
+# takes to say so.
+#
+# Fourteen, not seven. Over one week the seeded sleep and mood series
+# correlate at -0.55, over two at 0.25 and over four at 0.74. The
+# relationship is a trend, and a week of it is mostly noise pointing
+# whichever way the last bad night pointed. Claiming a link from seven
+# days would be the kind of statistics this app should not be doing.
+MOVE_TOGETHER = 0.45
+MIN_PAIRED_DAYS = 14
+
+
+def correlate(a: dict | None, b: dict | None) -> dict | None:
+    """
+    Pearson correlation of two agents' days, over the days they share.
+
+    Returns None when there is not enough overlap, or when either series
+    never varies: a flat week has no correlation to report, and dividing
+    by its zero spread would invent one.
+    """
+    if not a or not b:
+        return None
+    days = sorted(set(a) & set(b))
+    n = len(days)
+    if n < MIN_PAIRED_DAYS:
+        return None
+
+    xs = [float(a[d]) for d in days]
+    ys = [float(b[d]) for d in days]
+    mx, my = sum(xs) / n, sum(ys) / n
+    dx = [x - mx for x in xs]
+    dy = [y - my for y in ys]
+    top = sum(p * q for p, q in zip(dx, dy))
+    spread = (sum(p * p for p in dx) * sum(q * q for q in dy)) ** 0.5
+    if spread == 0:
+        return None
+    return {"r": round(top / spread, 2), "days": n}
+
+
 class InsightsAgent(BaseAgent):
     name = "insights"
     description = (
@@ -65,12 +104,30 @@ class InsightsAgent(BaseAgent):
             """A domain only counts if something was actually logged."""
             return bool(domain.get("has_data"))
 
-        # Sleep <-> mood is the best-established everyday link.
-        if (has(sleep) and has(mood) and sleep.get("status") == "poor"
-                and mood.get("status") == "low"):
+        # Sleep <-> mood is the best-established everyday link, and the
+        # headline finding of the whole project, so it is worth measuring
+        # rather than inferring.
+        #
+        # This used to fire when the sleep agent said "poor" and the mood
+        # agent said "low", which is two independent threshold crossings
+        # and not what "tracking alongside" means. It was also brittle in
+        # a way that only showed up on the day: the mood cutoff is an
+        # average of 4 or below, the seeded month averaged 4.1, and the
+        # insight vanished. A demo's headline should not turn on a tenth
+        # of a point, or on which side of a fortnight the weekends land.
+        #
+        # So: line the two agents' own days up against each other and
+        # measure whether they actually move together. Both series come
+        # over the bus from the agent that owns them.
+        link = correlate(sleep.get("by_day"), mood.get("by_day"))
+        if (link and link["days"] >= MIN_PAIRED_DAYS
+                and link["r"] >= MOVE_TOGETHER
+                and has(sleep) and sleep.get("avg_hours", 99) < sleep.get("target", 7)):
             out.append({
-                "insight": "Your low mood is tracking alongside short sleep",
-                "evidence": f"averaging {sleep.get('avg_hours')}h sleep, "
+                "insight": "Your mood is tracking alongside your sleep",
+                "evidence": f"across {link['days']} days they move together "
+                            f"(r={link['r']}), averaging "
+                            f"{sleep.get('avg_hours')}h sleep and "
                             f"mood {mood.get('avg_score')}/10",
                 "agents": ["sleep", "mood"],
             })

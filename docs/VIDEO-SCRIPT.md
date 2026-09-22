@@ -178,7 +178,7 @@ behind and you are back on time.
 
 ## 4:00 - 5:00 · Impact and future
 
-> Three hundred and seven tests pass, and writing them found real bugs.
+> Four hundred and thirty four tests pass, and writing them found real bugs.
 > Two were safety failures: "my face is drooping" slipped past the stroke
 > check because our terms assumed adjacent words. That is exactly the
 > failure you cannot see by reading code.
@@ -215,7 +215,7 @@ the safety block is the strongest twenty seconds you have.
 ## If something breaks live
 
 Set `MOCK_MODE=true` and restart. Everything except the model-driven food
-conversation and Azure voice still works, all 307 tests still pass, and the
+conversation and Azure voice still works, all 434 tests still pass, and the
 fallback is a point in your favour rather than an excuse: you designed for
 the service being unavailable.
 

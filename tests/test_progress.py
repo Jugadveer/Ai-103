@@ -213,3 +213,103 @@ def test_is_empty_detects_a_fresh_database(clean_db):
     assert is_empty() is True
     seed_demo_data()
     assert is_empty() is False
+
+
+# --- the headline insight, and the day it disappeared ---------------------
+
+def test_the_sleep_mood_link_does_not_depend_on_todays_date(clean_db,
+                                                            monkeypatch):
+    """
+    It did, and it broke.
+
+    The rule used to fire when the sleep agent said "poor" and the mood
+    agent said "low". Those are two independent threshold crossings, not
+    a correlation, and the mood one is an average of 4 or below. On
+    23 September the seeded month averaged 4.1 and the headline finding
+    of the whole project silently vanished. Which side of the line it
+    landed on depended on where the weekends fell in the window.
+
+    So the rule measures the link now, and this walks a fortnight of
+    start dates to prove the answer does not move with the calendar.
+    """
+    import datetime
+    import app.store.db as store
+    import scripts.seed as seeder
+    from app.main import build_bus
+    from app.store import users
+
+    real_date = datetime.date
+
+    class Frozen(real_date):
+        target = None
+
+        @classmethod
+        def today(cls):
+            return cls.target
+
+    monkeypatch.setattr(seeder, "date", Frozen)
+    monkeypatch.setattr(store, "date", Frozen)
+
+    missed = []
+    for offset in range(14):
+        Frozen.target = real_date(2026, 9, 23) + datetime.timedelta(days=offset)
+        store.delete_everything()
+        person = users.create(f"day{offset}@example.com", "Day", "a-password-x")
+        store.CURRENT_USER.set(person["id"])
+        seeder.seed_demo_data()
+
+        patterns = build_bus().get("insights").handle("patterns").data["patterns"]
+        joined = " ".join(p["insight"] for p in patterns).lower()
+        if "mood" not in joined or "sleep" not in joined:
+            missed.append(str(Frozen.target))
+
+    assert not missed, ("The sleep and mood link went missing on: "
+                        + ", ".join(missed))
+
+
+def test_the_link_is_measured_not_asserted(seeded_bus):
+    """The evidence has to carry the number, or it is just a claim."""
+    patterns = seeded_bus.get("insights").handle("patterns").data["patterns"]
+    link = next(p for p in patterns if "tracking alongside" in p["insight"])
+    assert "r=" in link["evidence"]
+    assert "days they move together" in link["evidence"]
+    assert link["agents"] == ["sleep", "mood"]
+
+
+def test_a_week_is_not_enough_to_claim_a_link():
+    """
+    Over seven days the seeded series correlate at -0.55, the opposite of
+    the real relationship. Claiming a trend from that would be worse than
+    claiming nothing.
+    """
+    from app.agents.insights import MIN_PAIRED_DAYS, correlate
+    assert MIN_PAIRED_DAYS >= 14
+    week = {f"2026-09-{d:02d}": d for d in range(1, 8)}
+    assert correlate(week, week) is None, "seven days should not qualify"
+
+
+def test_a_flat_series_reports_no_link():
+    """Dividing by a zero spread would invent a correlation."""
+    from app.agents.insights import correlate
+    days = {f"2026-09-{d:02d}": 7 for d in range(1, 21)}
+    varies = {f"2026-09-{d:02d}": d for d in range(1, 21)}
+    assert correlate(days, varies) is None
+    assert correlate(days, days) is None
+
+
+def test_correlate_finds_a_real_relationship():
+    from app.agents.insights import correlate
+    rising = {f"2026-09-{d:02d}": d for d in range(1, 21)}
+    falling = {f"2026-09-{d:02d}": 21 - d for d in range(1, 21)}
+    assert correlate(rising, rising)["r"] == 1.0
+    assert correlate(rising, falling)["r"] == -1.0
+    assert correlate(rising, rising)["days"] == 20
+
+
+def test_correlate_only_uses_days_both_agents_have():
+    from app.agents.insights import correlate
+    a = {f"2026-09-{d:02d}": d for d in range(1, 26)}
+    b = {f"2026-09-{d:02d}": d for d in range(1, 16)}
+    assert correlate(a, b)["days"] == 15
+    assert correlate(a, None) is None
+    assert correlate({}, b) is None

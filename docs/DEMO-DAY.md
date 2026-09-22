@@ -197,6 +197,15 @@ words "you have". One question making nineteen agent calls instead of
 eight, then later seventeen instead of nine, because routing was spelled
 as a data request. None of those were visible by reading the code.
 
+The one worth telling, if they ask for a single example: the headline
+sleep and mood insight disappeared overnight. It fired when the sleep
+agent said "poor" and the mood agent said "low", which is two separate
+threshold crossings and not a correlation at all. The seeded month
+averaged a mood of 4.1 against a cutoff of 4, and which side of that line
+it landed on depended on where the weekends fell. It measures the
+correlation now, quotes the coefficient, and a test walks a fortnight of
+start dates to prove the answer does not move with the calendar.
+
 **"Why Vercel and Postgres rather than a file?"**
 
 A serverless host throws its filesystem away between requests. That was
@@ -210,7 +219,7 @@ deployed, and `/api/health` says which one it got.
 ## If something breaks
 
 **Azure is down or slow.** Set `MOCK_MODE=true` and restart. Everything
-except the model-driven food conversation and voice still works, all 413
+except the model-driven food conversation and voice still works, all 434
 tests still pass, and the fallback is a point in your favour: you
 designed for the service being unavailable.
 
@@ -229,7 +238,7 @@ what it says. Type instead; nothing else depends on it.
 ## The numbers, if you are asked
 
 - 13 agents, 8 holding data, 5 holding none and working by asking
-- 413 tests, all passing, entirely offline
+- 434 tests, all passing, entirely offline
 - 4 safety layers, the first two with no network dependency
 - 30 days of seeded history, deliberately shaped: sleep declines across
   the month, mood declines with it, and three days are missing so the

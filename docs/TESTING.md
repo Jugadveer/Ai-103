@@ -4,7 +4,7 @@
 python -m pytest tests/ -q
 ```
 
-**337 tests, all passing, in about a minute.** No Azure credentials needed,
+**434 tests, all passing, in about two minutes.** No Azure credentials needed,
 the suite runs entirely in `MOCK_MODE` against a throwaway SQLite file.
 
 Testing, reliability and responsible AI carry 15% of the project grade, and
@@ -14,17 +14,20 @@ the safety tests below are the ones to demonstrate if asked.
 
 | Suite | Tests | Focus |
 |---|---|---|
-| `test_validation.py` | 24 | Plausible ranges for every health value |
+| `test_triage.py` | 66 | The safety layer that generalises, and its limits |
+| `test_nutrition.py` | 41 | Food recognition and the meal conversation |
 | `test_nlu.py` | 41 | Intent classification and entity extraction |
+| `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
+| `test_progress.py` | 34 | Streaks, achievements, the seeded dataset |
 | `test_safety.py` | 32 | Escalation, refusal, and not over-blocking |
 | `test_agents.py` | 30 | Each agent's calculations on its own |
-| `test_crossagent.py` | 19 | Agents talking to each other, and the trace |
-| `test_nutrition.py` | 41 | Food recognition and the meal conversation |
-| `test_assessment.py` | 35 | Energy estimates and the limits it keeps to |
-| `test_progress.py` | 28 | Streaks, achievements, the seeded dataset |
-| `test_knowledge.py` | 41 | Health answering and its guardrail |
+| `test_validation.py` | 24 | Plausible ranges for every health value |
 | `test_auth.py` | 24 | Sign up, sign in, sessions, and the gate |
+| `test_crossagent.py` | 19 | Agents talking to each other, and the trace |
 | `test_api.py` | 16 | Every endpoint, plus deployment readiness |
+| `test_live_model.py` | 14 | The paths that only run when Azure is configured |
+| `test_postgres.py` | 11 | That the same SQL is legal on both backends |
 | `test_isolation.py` | 6 | That one account cannot see another's data |
 
 ## The tests that matter most
@@ -79,6 +82,10 @@ question to be asked in the viva.
 | "my throat **is** closing up" bypassed the anaphylaxis red flag | same | same |
 | With an empty database the app claimed "you're running low on food and fluids" | `test_insights_says_so_when_there_is_nothing` | Agents now report `has_data`; no pattern is asserted without evidence |
 | The doctor summary printed empty sections for domains with no data | `test_report_declines_when_data_is_thin` | Sections are gated on `has_data` |
+| "I think I am having a heart attack" got an eight-hop correlation, because "chest pain" was on the red-flag list and "heart attack" was not | attacking the deployed app | A model triage layer that generalises, with the list kept underneath it as an offline floor |
+| Asking how many mg of paracetamol to take was answered with a mental-health message | same | Azure scores that and "I don't want to be here anymore" identically, so the shape of the message picks between them, defaulting to the careful one |
+| "What is my streak" made 17 agent calls and then said it had no access to the streak | same | Routing was spelled as a data request, and a meta-agent's report never reached the model |
+| The headline sleep and mood insight silently vanished on 23 September | `test_the_sleep_mood_link_does_not_depend_on_todays_date` | It fired on two threshold crossings, one of which the seeded month sat 0.1 above. It measures the correlation now |
 | A database written before accounts existed survived startup, because `CREATE TABLE IF NOT EXISTS` will not add a column, then failed on the first query | first run of `test_isolation.py` | Startup detects the old shape and moves the file aside rather than crashing |
 
 The two safety misses are the important ones. Both were false negatives on
