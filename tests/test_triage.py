@@ -382,8 +382,9 @@ def test_a_prompt_azure_will_not_process_is_treated_as_sensitive(model):
     model("", reason="content_filter")
     result = safety.check("how many mg of paracetamol should I take", deep=True)
     assert result["safe"] is False
-    assert result["reason"] == "content_filter"
     assert result["matched"] == "azure:prompt_filter"
+    # Read as a medication question, because it is shaped like one.
+    assert result["reason"] == "medication"
     assert "pharmacist" in result["message"]
     assert "struggling" not in result["message"]
     assert "14416" not in result["message"]      # not a crisis, a dose question
@@ -403,3 +404,73 @@ def test_a_real_outage_does_not_block_everything(model):
 def test_an_unconfigured_model_does_not_block_everything(model):
     model("", reason="not_configured")
     assert safety.triage("I feel tired") is None
+
+
+# --- when Azure cannot tell a crisis from a dose question -----------------
+
+def test_azure_genuinely_cannot_separate_these_two():
+    """
+    Documents why the shape check exists. Both of these come back from
+    Azure OpenAI as a refused prompt and from Content Safety as SelfHarm
+    at severity 4. Neither signal separates them, and they need opposite
+    answers.
+    """
+    crisis = "I don't want to be here anymore"
+    dose = "how many mg of paracetamol should I take"
+    assert not safety.looks_like_a_dose_question(crisis)
+    assert safety.looks_like_a_dose_question(dose)
+
+
+@pytest.mark.parametrize("message", [
+    "how many mg of paracetamol should I take",
+    "should I take 500mg or 650mg",
+    "what dosage of vitamin d",
+    "how many tablets should I take",
+])
+def test_a_dose_shaped_message_gets_the_pharmacist(model, message):
+    model("", reason="content_filter")
+    result = safety.check(message, deep=True)
+    assert result["reason"] == "medication"
+    assert "pharmacist" in result["message"]
+    assert "14416" not in result["message"]
+
+
+@pytest.mark.parametrize("message", [
+    "I don't want to be here anymore",
+    "life is not worth living",
+    "I feel hopeless and empty",
+    "I don't see the point anymore",
+])
+def test_anything_else_azure_refuses_is_treated_as_a_crisis(model, message):
+    """
+    The deliberate default. Someone asking about paracetamol who sees a
+    helpline is mildly puzzled. Someone in crisis who is told to ask a
+    pharmacist has been failed, and that asymmetry decides the tie.
+    """
+    model("", reason="content_filter")
+    result = safety.check(message, deep=True)
+    assert result["reason"] == "self_harm"
+    assert "14416" in result["message"]
+
+
+def test_the_same_rule_applies_to_a_content_safety_hit(monkeypatch):
+    from app.services import llm
+    monkeypatch.setattr(llm, "available", lambda: False)
+    monkeypatch.setattr(safety, "content_safety_flags", lambda *a, **k: "SelfHarm")
+
+    crisis = safety.check("I don't want to be here anymore", deep=True)
+    assert "14416" in crisis["message"]
+
+    dose = safety.check("how many mg should I take", deep=True)
+    assert "pharmacist" in dose["message"]
+    assert "14416" not in dose["message"]
+
+
+@pytest.mark.parametrize("ordinary", [
+    "I slept 6 hours", "I walked 4000 steps", "I drank 3 glasses of water",
+    "I have a mild sore throat", "my mood is 6 out of 10",
+])
+def test_the_shape_check_does_not_fire_on_ordinary_logging(ordinary):
+    """A number next to a unit is everywhere in this app. It must not
+    turn "I slept 6 hours" into a medication question."""
+    assert not safety.looks_like_a_dose_question(ordinary)

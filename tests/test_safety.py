@@ -24,19 +24,25 @@ def test_emergencies_are_escalated(text):
     assert "112" in v["message"]
 
 
-@pytest.mark.parametrize("text", [
-    "diagnose me please",
-    "what disease do I have",
-    "do I have diabetes",
-    "what medicine should I take",
-    "what dose of paracetamol",
-    "can I stop taking my tablets",
-    "is it safe to mix these",
+@pytest.mark.parametrize("text,reason", [
+    # Asking what is wrong. These now get a referral rather than a flat
+    # refusal: which clinician, and how soon.
+    ("diagnose me please", "out_of_scope"),
+    ("what disease do I have", "out_of_scope"),
+    ("do I have diabetes", "out_of_scope"),
+    # Asking about medicine. There is no useful version of that answer
+    # from an app, so these stay a plain no, labelled separately so a log
+    # line says which kind of refusal it was.
+    ("what medicine should I take", "medication"),
+    ("what dose of paracetamol", "medication"),
+    ("can I stop taking my tablets", "medication"),
+    ("is it safe to mix these", "medication"),
 ])
-def test_diagnosis_and_dosing_refused(text):
+def test_diagnosis_and_dosing_refused(text, reason):
     v = safety.check(text)
     assert v["safe"] is False
-    assert v["reason"] == "out_of_scope"
+    assert v["reason"] == reason
+    assert v["message"]
 
 
 @pytest.mark.parametrize("text", [
@@ -71,14 +77,21 @@ def test_guardrails_do_not_need_the_network():
 
 
 def test_content_safety_fails_open_without_credentials():
-    assert safety.content_safety_flags("anything at all") is False
+    # Returns the flagged category now, or "" for nothing flagged. The
+    # category is needed because "how many mg should I take" and "I don't
+    # want to be here" both come back as SelfHarm and need opposite
+    # answers. Falsy either way, so callers reading it as a yes or no are
+    # unaffected.
+    assert safety.content_safety_flags("anything at all") == ""
+    assert not safety.content_safety_flags("anything at all")
 
 
 def test_local_layers_run_without_the_deep_check():
     """Red flags and scope must be caught with deep=False (no network)."""
     assert safety.check("I have chest pain", deep=False)["reason"] == "red_flag"
     assert safety.check("what dose should i take", deep=False)["reason"] == \
-        "out_of_scope"
+        "medication"
+    assert safety.check("diagnose me", deep=False)["reason"] == "out_of_scope"
 
 
 def test_deep_check_is_opt_in(monkeypatch):

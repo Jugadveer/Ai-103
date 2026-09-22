@@ -114,6 +114,40 @@ CRISIS_MESSAGE = (
 )
 
 
+# Telling a dose question apart from a crisis, when Azure cannot.
+#
+# Both of these come back from Azure as self-harm, at the same severity:
+#
+#   "I don't want to be here anymore"
+#   "how many mg of paracetamol should I take"
+#
+# Azure OpenAI refuses to classify either, and Content Safety scores both
+# SelfHarm 4. That is reasonable of them and useless to us, because the
+# two need opposite answers: one needs a helpline, the other needs a
+# pharmacist, and giving either person the other's message is bad.
+#
+# A dose question has a shape. A number next to a unit, or the words dose
+# and dosage, or asking how many of something to take. A person in crisis
+# does not write like that. So: a positive match here means treat it as a
+# medication question, and anything else ambiguous is treated as a
+# possible crisis.
+#
+# That default is deliberate and the costs are not symmetric. Someone
+# asking about paracetamol who sees a helpline is mildly puzzled. Someone
+# in crisis who gets told to ask a pharmacist has been failed by us.
+DOSE_SHAPES = [re.compile(p, re.IGNORECASE) for p in (
+    r"\b\d+\s*(?:mg|mcg|ug|ml|iu|grams?|g)\b",
+    r"\bdos(?:e|es|age|ing)\b",
+    r"\bhow (?:many|much)\b.{0,30}\b(?:mg|ml|tablets?|pills?|capsules?)\b",
+    r"\b(?:tablets?|pills?|capsules?)\b.{0,20}\b(?:take|takes|taking)\b",
+    r"\b(?:take|taking)\b.{0,20}\b(?:tablets?|pills?|capsules?)\b",
+)]
+
+
+def looks_like_a_dose_question(text: str) -> bool:
+    return any(shape.search(text or "") for shape in DOSE_SHAPES)
+
+
 # People insert filler inside a phrase: "face drooping" is also said as
 # "face is drooping", "throat closing" as "throat is closing up". A safety
 # list that only matches adjacent words misses those, so multi-word terms
@@ -193,13 +227,16 @@ def triage(text: str) -> dict | None:
         return None
 
     if reason == "content_filter":
-        # Azure would not even classify it. That is a verdict of its own,
-        # and the safe reading is that the message was sensitive rather
-        # than that the service was down. Neutral wording, because we do
-        # not know which way it was sensitive.
-        log.warn("triage_filtered")
-        return {"safe": False, "reason": "content_filter",
-                "matched": "azure:prompt_filter", "message": HARMFUL_MESSAGE}
+        # Azure would not even classify it, which is a verdict of its own:
+        # the message was sensitive, not the service missing. Which way it
+        # was sensitive is the part Azure does not tell us, so the shape of
+        # the message decides, and the default is the careful one.
+        dose = looks_like_a_dose_question(text)
+        log.warn("triage_filtered", read_as="medication" if dose else "crisis")
+        return {"safe": False,
+                "reason": "medication" if dose else "self_harm",
+                "matched": "azure:prompt_filter",
+                "message": MEDICATION_MESSAGE if dose else CRISIS_MESSAGE}
     if reason != "ok":
         return None
 
@@ -262,10 +299,14 @@ def check(text: str, deep: bool = False) -> dict:
         # A request to diagnose gets pointed at the right clinician. A
         # request about medication does not, because there is no useful
         # version of that answer from an app.
-        message = (_referral_or_refusal(text) if matched in DIAGNOSIS_TERMS
-                   else MEDICATION_MESSAGE)
-        return {"safe": False, "reason": "out_of_scope", "matched": matched,
-                "message": message}
+        diagnosis = matched in DIAGNOSIS_TERMS
+        # Same names the model triage uses, so a log line or a trace
+        # reads the same whichever layer did the blocking.
+        return {"safe": False,
+                "reason": "out_of_scope" if diagnosis else "medication",
+                "matched": matched,
+                "message": (_referral_or_refusal(text) if diagnosis
+                            else MEDICATION_MESSAGE)}
 
     if deep:
         # The lists found nothing. Ask the model before deciding this is
@@ -278,13 +319,21 @@ def check(text: str, deep: bool = False) -> dict:
     if deep:
         category = content_safety_flags(text)
         if category:
-            # Self-harm gets the crisis message and a helpline. Anything
-            # else gets a plain refusal, because telling someone who asked
-            # about a dose that help is available reads as a non sequitur.
-            crisis = "selfharm" in category.lower()
+            # Content Safety scores a dosage question and a statement
+            # about not wanting to be alive identically, both SelfHarm at
+            # severity 4, so the category alone cannot pick the message.
+            # Same rule as above: a dose-shaped message is a dose
+            # question, and everything else flagged this way is treated
+            # as a possible crisis.
+            if "selfharm" in category.lower():
+                dose = looks_like_a_dose_question(text)
+                return {"safe": False,
+                        "reason": "medication" if dose else "self_harm",
+                        "matched": f"azure:{category}",
+                        "message": MEDICATION_MESSAGE if dose else CRISIS_MESSAGE}
             return {"safe": False, "reason": "content_safety",
                     "matched": f"azure:{category}",
-                    "message": CRISIS_MESSAGE if crisis else HARMFUL_MESSAGE}
+                    "message": HARMFUL_MESSAGE}
 
     return {"safe": True, "reason": "", "matched": "", "message": ""}
 
@@ -312,7 +361,7 @@ def content_safety_flags(text: str, threshold: int = 4) -> str:
     network blip must not block a legitimate wellness question.
     """
     if not content_safety_available():
-        return False
+        return ""
 
     try:
         from azure.ai.contentsafety import ContentSafetyClient
