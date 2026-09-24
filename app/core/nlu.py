@@ -131,10 +131,33 @@ def _expand_word_numbers(text: str) -> str:
     return out
 
 
+def _expand_compact_numbers(text: str) -> str:
+    """
+    Turn '10k steps' into '10000 steps', and '10,000' into '10000'.
+
+    Step counts are the one figure people almost always shorten, and they
+    shorten it more when speaking than when typing, so anything arriving
+    through the microphone has to survive it. Both forms used to fail,
+    and both failed silently:
+
+      "I walked 10k steps"  - no step rule matched '10k', so the exercise
+                              rule matched the bare 10 and logged ten
+                              minutes of walking.
+      "10,000 steps"        - the number rule matched the '000' after the
+                              comma and logged zero steps.
+
+    A unit is only expanded when the k stands alone, so kg, km and kcal
+    are left exactly as they are.
+    """
+    out = re.sub(r"(?<=\d),(?=\d{3}\b)", "", text)
+    return re.sub(r"\b(\d+(?:\.\d+)?)\s*k\b",
+                  lambda m: f"{float(m.group(1)) * 1000:g}", out)
+
+
 def parse(text: str) -> dict:
     """Extract an intent and its entities from a user message."""
     raw = (text or "").strip()
-    low = _expand_word_numbers(raw.lower())
+    low = _expand_compact_numbers(_expand_word_numbers(raw.lower()))
 
     # A question about a number is not an instruction to log one.
     asking = any(neg in low for neg in _NEGATORS)
