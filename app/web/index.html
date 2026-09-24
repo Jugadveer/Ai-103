@@ -140,10 +140,21 @@
     <div class="quick" id="quick">
       <button data-action="water"  data-value="1">Water <span class="plus">+1 glass</span></button>
       <button data-action="meal"   data-value="400">Meal <span class="plus">+400 kcal</span></button>
-      <button data-action="steps"  data-value="1000">Steps <span class="plus">+1000</span></button>
       <button data-action="active" data-value="15">Movement <span class="plus">+15 min</span></button>
       <button data-action="sleep"  data-value="7">Sleep <span class="plus">7 hours</span></button>
+      <form class="quick-entry" id="quick-steps">
+        <label for="in-quick-steps">Steps</label>
+        <input type="number" id="in-quick-steps" min="1" max="100000"
+               placeholder="10000" inputmode="numeric"
+               aria-label="Step count for today">
+        <button type="submit">Set</button>
+      </form>
     </div>
+    <p class="tally" style="margin:8px 0 0">
+      Steps are the total for the day, read off your phone or watch, so
+      setting it again replaces the figure rather than adding to it. You
+      can also just say it: <em>I walked 10k steps</em>.
+    </p>
 
     <div class="section-title">How are you feeling
       <span class="tally">self-reported, nothing here senses it</span></div>
@@ -314,7 +325,8 @@ I am a wellness coach, not a doctor. I share general information and never diagn
     <div class="section-title">Activity, entered by hand</div>
     <p class="placeholder" style="margin:-4px 0 12px">
       There is no step counter here either. If your phone or watch tracks
-      steps, read the number off it and enter it below.
+      steps, read the number off it and enter it below. It is the day's
+      total, so entering it again replaces it. Active minutes add up.
     </p>
     <form class="entry-form" id="activity-form">
       <label>Steps today

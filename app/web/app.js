@@ -169,7 +169,8 @@ async function refreshTodayInsights() {
 
 $('quick').addEventListener('click', async e => {
   const btn = e.target.closest('button');
-  if (!btn) return;
+  // The steps entry lives in this row but submits its own form below.
+  if (!btn || !btn.dataset.action) return;
   btn.disabled = true;
   const r = await api.post('/api/quicklog', {
     action: btn.dataset.action, value: Number(btn.dataset.value),
@@ -177,6 +178,19 @@ $('quick').addEventListener('click', async e => {
   const d = await r.json();
   toast(d.ok ? 'Logged.' : d.message, d.ok ? '' : 'warn');
   btn.disabled = false;
+  refreshToday();
+});
+
+$('quick-steps').addEventListener('submit', async e => {
+  e.preventDefault();
+  const field = $('in-quick-steps');
+  const steps = Number(field.value) || 0;
+  if (!steps) { field.focus(); return; }
+  const d = await (await api.post('/api/quicklog',
+    { action: 'steps', value: steps })).json();
+  toast(d.ok ? `Steps set to ${steps.toLocaleString()}.` : d.message,
+        d.ok ? '' : 'warn');
+  if (d.ok) field.value = '';
   refreshToday();
 });
 

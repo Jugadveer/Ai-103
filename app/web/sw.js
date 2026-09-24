@@ -11,7 +11,7 @@
    user did not ask for.
    =================================================================== */
 
-const CACHE = 'health-coach-v2';
+const CACHE = 'health-coach-v3';
 
 const SHELL = [
   '/',
