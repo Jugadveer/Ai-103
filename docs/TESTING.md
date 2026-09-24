@@ -87,6 +87,9 @@ question to be asked in the viva.
 | "What is my streak" made 17 agent calls and then said it had no access to the streak | same | Routing was spelled as a data request, and a meta-agent's report never reached the model |
 | The headline sleep and mood insight silently vanished on 23 September | `test_the_sleep_mood_link_does_not_depend_on_todays_date` | It fired on two threshold crossings, one of which the seeded month sat 0.1 above. It measures the correlation now |
 | A database written before accounts existed survived startup, because `CREATE TABLE IF NOT EXISTS` will not add a column, then failed on the first query | first run of `test_isolation.py` | Startup detects the old shape and moves the file aside rather than crashing |
+| Logging sleep twice in one day added the two figures together: 4.8 hours seeded plus a 6 became 10.8 hours in bed, and the status flipped from `poor` to `ok` | preparing the demo account | Sleep and steps restate the day's figure instead of appending to it |
+| "I walked 10k steps" logged ten minutes of walking, because no step rule matched `10k` and the exercise rule matched the bare 10 underneath it | `test_a_shortened_count_is_not_read_as_exercise_minutes` | A lone `k` is expanded to a thousand before any rule runs; `kg`, `km` and `kcal` keep theirs |
+| "10,000 steps" logged zero steps, the number rule having matched the `000` after the comma | `test_a_thousands_separator_is_not_read_as_zero` | Thousands separators are stripped between digits |
 
 The two safety misses are the important ones. Both were false negatives on
 stroke and anaphylaxis presentations, which is exactly the failure mode that matters
