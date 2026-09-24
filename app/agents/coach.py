@@ -87,9 +87,12 @@ HELP_TEXT = (
 LOG_ACTIONS = {
     "log_water": ("hydration", db.add_water, "water_glasses",
                   "Logged {v:g} glasses of water."),
+    # Sleep and steps restate the day's figure instead of adding to
+    # it, so the confirmation says "set", not "logged".
     "log_sleep": ("sleep", db.add_sleep, "sleep_hours",
-                  "Logged {v:g} hours of sleep."),
-    "log_steps": ("activity", None, "steps", "Logged {v:g} steps."),
+                  "Set last night's sleep to {v:g} hours."),
+    "log_steps": ("activity", None, "steps",
+                  "Set today's steps to {v:,g}."),
     "log_exercise": ("activity", None, "exercise_mins",
                      "Logged {v:g} minutes of activity."),
     "log_mood": ("mood", db.add_mood, "mood_score",
@@ -195,7 +198,7 @@ class CoachAgent(BaseAgent):
             if writer is not None:
                 writer(value)
             elif intent == "log_steps":
-                db.add_activity("steps", steps=value)
+                db.set_steps(value)
             elif intent == "log_exercise":
                 db.add_activity("exercise", minutes=value)
             else:  # vitals share one writer keyed by metric name

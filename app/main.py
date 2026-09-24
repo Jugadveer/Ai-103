@@ -309,7 +309,7 @@ class QuickLog(BaseModel):
 QUICK_ACTIONS = {
     "water":  lambda v: db.add_water(v or 1),
     "sleep":  lambda v: db.add_sleep(v or 7),
-    "steps":  lambda v: db.add_activity("steps", steps=v or 1000),
+    "steps":  lambda v: db.set_steps(v or 1000),
     "active": lambda v: db.add_activity("exercise", minutes=v or 15),
     "meal":   lambda v: db.add_meal("quick entry", v or 400),
     "mood":   lambda v: db.add_mood(v or 5),

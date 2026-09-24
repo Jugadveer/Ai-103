@@ -126,7 +126,7 @@ def _seed_meals(rng, day, offset, drift):
 
 def _seed_activity(rng, day, weekend, drift):
     steps = int(max(400, rng.gauss(8200 - 4200 * drift, 1600)))
-    db.add_activity("steps", steps=steps, day=day)
+    db.set_steps(steps, day=day)
 
     chance = 0.62 if weekend else 0.42 - 0.2 * drift
     if rng.random() < chance:

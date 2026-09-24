@@ -312,6 +312,28 @@ def _insert(sql: str, params: tuple) -> int:
         return s.run(sql, params).lastrowid or 0
 
 
+def _replace(delete_sql: str, delete_params: tuple,
+             insert_sql: str, insert_params: tuple) -> None:
+    """
+    Write one row for a day, clearing whatever was there before it.
+
+    Most things here accumulate: a second glass of water, a second meal,
+    a second walk all belong on the pile, so _insert is right for them.
+    A few do not. You sleep once a night, and a step count read off a
+    watch is a running total rather than an increment. Appending those
+    gave nonsense - logging seven hours twice meant fourteen hours in
+    bed, and reading 6,000 steps at noon then 10,000 at night meant
+    16,000.
+
+    Both statements share one connection, so the delete cannot commit
+    without the insert that replaces it.
+    """
+    owner = current_user()
+    with connect() as s:
+        s.run(delete_sql, (owner,) + delete_params)
+        s.run(insert_sql, (owner,) + insert_params)
+
+
 # --- writers. Each one validates before it touches the database. ---------
 # The leading user_id column is filled in by _insert, so no caller can
 # forget it and no caller can spoof it.
@@ -336,11 +358,15 @@ def add_water(glasses, day: str | None = None) -> None:
 
 
 def add_sleep(hours, quality: str = "", day: str | None = None) -> None:
+    """Record a night's sleep, replacing any figure already given for it."""
     h = check_number("sleep_hours", hours)
-    _insert(
+    when = day or today()
+    _replace(
+        "DELETE FROM sleep WHERE user_id = ? AND day = ?",
+        (when,),
         "INSERT INTO sleep (user_id, day, hours, quality, logged_at) "
         "VALUES (?, ?, ?, ?, ?)",
-        (day or today(), h, quality, _now()),
+        (when, h, quality, _now()),
     )
 
 
@@ -360,6 +386,28 @@ def add_activity(kind: str, minutes=0, steps=0, day: str | None = None) -> None:
         "INSERT INTO activity (user_id, day, kind, minutes, steps, logged_at) "
         "VALUES (?, ?, ?, ?, ?, ?)",
         (day or today(), kind or "activity", mins, step_count, _now()),
+    )
+
+
+def set_steps(count, day: str | None = None) -> None:
+    """
+    Record the day's step count, replacing any earlier figure for it.
+
+    Steps are not logged one walk at a time - the number comes off a
+    phone or a watch, where it is already the total for the day. Saying
+    it again later restates that total, it does not add to it.
+
+    Only rows this function wrote are cleared, so a walk logged as
+    exercise keeps its minutes.
+    """
+    n = int(check_number("steps", count))
+    when = day or today()
+    _replace(
+        "DELETE FROM activity WHERE user_id = ? AND day = ? AND kind = ?",
+        (when, "steps"),
+        "INSERT INTO activity (user_id, day, kind, minutes, steps, logged_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (when, "steps", 0, n, _now()),
     )
 
 
