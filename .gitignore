@@ -29,3 +29,10 @@ Thumbs.db
 
 # Local editor and agent tooling - not part of the submission
 .claude/
+
+# Recorded footage for the demo video. Large, and not source code: the
+# video itself lives on YouTube and the edit project is outside this repo.
+videos/
+
+# Working copy kept while the deck was rewritten.
+*.original.pptx

@@ -10,7 +10,7 @@ September 2026.
 | Jugadveer | 2410992531 |
 | Ashnoor | 2410992511 |
 | Kanan | 2410992532 |
-| Husan | 2410992561 |
+| Husan | 2410992611 |
 | Kishika | 2410992540 |
 
 ## The problem
